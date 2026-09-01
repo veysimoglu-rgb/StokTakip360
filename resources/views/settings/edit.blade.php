@@ -21,8 +21,14 @@
                 <x-text-input id="default_vat_rate" type="number" step="0.01" min="0" max="100" name="default_vat_rate" value="{{ old('default_vat_rate', $settings['default_vat_rate'] ?? 20) }}" class="w-full" />
             </div>
             <div>
-                <x-input-label for="currency" value="Para Birimi" />
-                <x-text-input id="currency" name="currency" value="{{ old('currency', $settings['currency'] ?? 'TL') }}" class="w-full" />
+                <x-input-label for="currency" value="Varsayılan Para Birimi" />
+                <x-select-input id="currency" name="currency" class="w-full">
+                    @foreach (\App\Support\Currency::LIST as $code)
+                        <option value="{{ $code }}" @selected(old('currency', $settings['currency']) === $code)>
+                            {{ $code }} ({{ \App\Support\Currency::SYMBOLS[$code] }})
+                        </option>
+                    @endforeach
+                </x-select-input>
             </div>
 
             <div class="flex gap-3 pt-2">

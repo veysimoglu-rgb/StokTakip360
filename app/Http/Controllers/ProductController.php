@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\Setting;
+use App\Support\Currency;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
@@ -34,8 +37,10 @@ class ProductController extends Controller
     {
         $categories = Category::where('active', true)->orderBy('name')->get();
         $brands = Brand::where('active', true)->orderBy('name')->get();
+        $defaultVatRate = Setting::get('default_vat_rate', 20);
+        $defaultCurrency = Setting::get('currency', 'TL');
 
-        return view('products.create', compact('categories', 'brands'));
+        return view('products.create', compact('categories', 'brands', 'defaultVatRate', 'defaultCurrency'));
     }
 
     public function store(Request $request)
@@ -91,6 +96,7 @@ class ProductController extends Controller
             'shelf_location' => ['nullable', 'string', 'max:100'],
             'purchase_price' => ['required', 'numeric', 'min:0'],
             'sale_price' => ['required', 'numeric', 'min:0'],
+            'currency' => ['required', Rule::in(Currency::LIST)],
             'vat_rate' => ['required', 'numeric', 'min:0', 'max:100'],
             'description' => ['nullable', 'string'],
             'active' => ['nullable', 'boolean'],

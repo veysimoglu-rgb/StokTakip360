@@ -76,8 +76,18 @@
             </div>
 
             <div>
+                <x-input-label for="currency" value="Para Birimi" />
+                <x-select-input id="currency" name="currency" class="w-full" required>
+                    @foreach (\App\Support\Currency::LIST as $code)
+                        <option value="{{ $code }}" @selected(old('currency', $defaultCurrency) === $code)>{{ $code }}</option>
+                    @endforeach
+                </x-select-input>
+                <x-input-error :messages="$errors->get('currency')" class="mt-1" />
+            </div>
+
+            <div>
                 <x-input-label for="vat_rate" value="KDV (%)" />
-                <x-text-input id="vat_rate" type="number" step="0.01" min="0" max="100" name="vat_rate" value="{{ old('vat_rate', 20) }}" class="w-full" required />
+                <x-text-input id="vat_rate" type="number" step="0.01" min="0" max="100" name="vat_rate" value="{{ old('vat_rate', $defaultVatRate) }}" class="w-full" required />
                 <x-input-error :messages="$errors->get('vat_rate')" class="mt-1" />
             </div>
 

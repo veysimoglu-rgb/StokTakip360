@@ -14,10 +14,12 @@
             <p class="text-sm text-gray-500">Bugünkü Giriş / Çıkış</p>
             <p class="text-2xl font-semibold text-gray-800 mt-1">{{ $todayIn }} / {{ $todayOut }}</p>
         </div>
-        <div class="bg-white rounded-lg shadow p-5">
-            <p class="text-sm text-gray-500">Toplam Stok Değeri</p>
-            <p class="text-2xl font-semibold text-gray-800 mt-1">{{ number_format($stockValue, 2) }}</p>
-        </div>
+        @foreach ($stockValueByCurrency as $code => $total)
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm text-gray-500">Toplam Stok Değeri ({{ $code }})</p>
+                <p class="text-2xl font-semibold text-gray-800 mt-1">{{ \App\Support\Currency::formatWithSymbol($total, $code) }}</p>
+            </div>
+        @endforeach
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -50,7 +50,7 @@
                                 'text-red-600' => $product->current_stock <= $product->min_stock,
                             ])>{{ $product->current_stock }}</span>
                         </td>
-                        <td class="px-4 py-3 text-right">{{ number_format($product->sale_price, 2) }}</td>
+                        <td class="px-4 py-3 text-right">{{ \App\Support\Currency::format($product->sale_price, $product->currency) }}</td>
                         <td class="px-4 py-3">
                             @if ($product->active)
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800">Aktif</span>

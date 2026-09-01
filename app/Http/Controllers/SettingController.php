@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Setting;
+use App\Support\Currency;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SettingController extends Controller
 {
@@ -15,6 +17,7 @@ class SettingController extends Controller
         foreach (self::KEYS as $key) {
             $settings[$key] = Setting::get($key);
         }
+        $settings['currency'] = $settings['currency'] ?? 'TL';
 
         return view('settings.edit', compact('settings'));
     }
@@ -26,7 +29,7 @@ class SettingController extends Controller
             'company_phone' => ['nullable', 'string', 'max:50'],
             'company_address' => ['nullable', 'string'],
             'default_vat_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'currency' => ['nullable', 'string', 'max:10'],
+            'currency' => ['required', Rule::in(Currency::LIST)],
         ]);
 
         foreach ($data as $key => $value) {

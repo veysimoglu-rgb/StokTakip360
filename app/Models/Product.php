@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'code', 'barcode', 'name', 'category_id', 'brand_id', 'unit',
         'min_stock', 'current_stock', 'shelf_location',
-        'purchase_price', 'sale_price', 'vat_rate', 'description', 'active',
+        'purchase_price', 'sale_price', 'currency', 'vat_rate', 'description', 'active',
     ];
 
     protected $casts = [
