@@ -7,10 +7,10 @@
 
             <div>
                 <x-input-label for="product_id" value="Ürün" />
-                <x-select-input id="product_id" name="product_id" class="w-full" required autofocus>
+                <x-select-input id="product_id" name="product_id" class="w-full" required autofocus onchange="const p=this.options[this.selectedIndex]; if(p.dataset.price){document.getElementById('unit_price').value=p.dataset.price;}">
                     <option value="">Seçiniz</option>
                     @foreach ($products as $product)
-                        <option value="{{ $product->id }}" @selected(old('product_id') == $product->id)>
+                        <option value="{{ $product->id }}" data-price="{{ $product->sale_price }}" @selected(old('product_id') == $product->id)>
                             {{ $product->code }} - {{ $product->name }} (Stok: {{ $product->current_stock }} {{ $product->unit }})
                         </option>
                     @endforeach

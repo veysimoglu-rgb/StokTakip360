@@ -34,6 +34,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/low-stock', [ReportController::class, 'lowStock'])->name('reports.low-stock');
+    Route::get('/reports/movement-value', [ReportController::class, 'movementValue'])->name('reports.movement-value');
+    Route::get('/reports/movement-value/export', [ReportController::class, 'movementValueExport'])->name('reports.movement-value.export');
+    Route::get('/reports/movement-value/print', [ReportController::class, 'movementValuePrint'])->name('reports.movement-value.print');
 
     Route::middleware('role:Admin')->group(function () {
         Route::resource('products', ProductController::class)->except(['index', 'show']);

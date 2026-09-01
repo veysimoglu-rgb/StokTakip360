@@ -10,5 +10,9 @@
             <h3 class="font-semibold text-gray-800">Stok Hareketleri</h3>
             <p class="text-sm text-gray-500 mt-1">Tüm giriş/çıkış hareketlerinin listesi.</p>
         </a>
+        <a href="{{ route('reports.movement-value') }}" class="bg-white rounded-lg shadow p-6 hover:shadow-md transition">
+            <h3 class="font-semibold text-gray-800">Stok Hareketi Değer Raporu</h3>
+            <p class="text-sm text-gray-500 mt-1">Hareketlerin kayıtlı fiyatına göre parasal değeri.</p>
+        </a>
     </div>
 </x-app-layout>

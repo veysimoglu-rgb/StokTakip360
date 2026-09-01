@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class StockMovement extends Model
 {
     protected $fillable = [
-        'product_id', 'type', 'quantity', 'unit_price',
+        'product_id', 'type', 'quantity', 'unit_price', 'currency',
         'customer_id', 'supplier_id', 'user_id', 'note', 'movement_date',
     ];
 
@@ -34,5 +34,18 @@ class StockMovement extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * quantity × recorded unit_price, or null when no price was recorded.
+     * Never falls back to the product's current price.
+     */
+    public function amount(): ?float
+    {
+        if ($this->unit_price <= 0) {
+            return null;
+        }
+
+        return $this->quantity * (float) $this->unit_price;
     }
 }
