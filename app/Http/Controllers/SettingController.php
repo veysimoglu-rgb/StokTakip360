@@ -1,0 +1,38 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Setting;
+use Illuminate\Http\Request;
+
+class SettingController extends Controller
+{
+    private const KEYS = ['company_name', 'company_phone', 'company_address', 'default_vat_rate', 'currency'];
+
+    public function edit()
+    {
+        $settings = [];
+        foreach (self::KEYS as $key) {
+            $settings[$key] = Setting::get($key);
+        }
+
+        return view('settings.edit', compact('settings'));
+    }
+
+    public function update(Request $request)
+    {
+        $data = $request->validate([
+            'company_name' => ['nullable', 'string', 'max:255'],
+            'company_phone' => ['nullable', 'string', 'max:50'],
+            'company_address' => ['nullable', 'string'],
+            'default_vat_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'currency' => ['nullable', 'string', 'max:10'],
+        ]);
+
+        foreach ($data as $key => $value) {
+            Setting::set($key, $value);
+        }
+
+        return back()->with('success', 'Ayarlar kaydedildi.');
+    }
+}

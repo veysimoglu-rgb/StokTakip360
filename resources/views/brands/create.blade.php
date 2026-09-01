@@ -1,0 +1,24 @@
+<x-app-layout>
+    <x-slot name="title">Yeni Marka</x-slot>
+
+    <div class="bg-white rounded-lg shadow p-6 max-w-lg">
+        <form method="POST" action="{{ route('brands.store') }}" class="space-y-4">
+            @csrf
+            <div>
+                <x-input-label for="name" value="Ad" />
+                <x-text-input id="name" name="name" value="{{ old('name') }}" class="w-full" required autofocus />
+                <x-input-error :messages="$errors->get('name')" class="mt-1" />
+            </div>
+
+            <label class="inline-flex items-center">
+                <input type="checkbox" name="active" value="1" checked class="rounded border-gray-300 text-indigo-600">
+                <span class="ms-2 text-sm text-gray-700">Aktif</span>
+            </label>
+
+            <div class="flex gap-3 pt-2">
+                <x-primary-button>Kaydet</x-primary-button>
+                <a href="{{ route('brands.index') }}" class="text-sm text-gray-600 self-center hover:underline">Vazgeç</a>
+            </div>
+        </form>
+    </div>
+</x-app-layout>
