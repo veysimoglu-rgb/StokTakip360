@@ -12,15 +12,27 @@ class Currency
         'EUR' => '€',
     ];
 
-    public static function format(float $amount, string $currency): string
+    public static function format(float $amount, ?string $currency): string
     {
-        return number_format($amount, 2, ',', '.').' '.$currency;
+        $number = number_format($amount, 2, ',', '.');
+
+        if ($currency === null) {
+            return $number;
+        }
+
+        return $number.' '.$currency;
     }
 
-    public static function formatWithSymbol(float $amount, string $currency): string
+    public static function formatWithSymbol(float $amount, ?string $currency): string
     {
+        $number = number_format($amount, 2, ',', '.');
+
+        if ($currency === null) {
+            return $number;
+        }
+
         $symbol = self::SYMBOLS[$currency] ?? $currency;
 
-        return $symbol.' '.number_format($amount, 2, ',', '.');
+        return $symbol.' '.$number;
     }
 }
