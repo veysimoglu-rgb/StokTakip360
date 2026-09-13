@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Customer;
+use App\Models\Account;
 use App\Models\Product;
 use App\Models\StockMovement;
-use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -13,7 +12,7 @@ class StockMovementController extends Controller
 {
     public function index(Request $request)
     {
-        $movements = StockMovement::with(['product', 'customer', 'supplier', 'user'])
+        $movements = StockMovement::with(['product', 'account', 'user'])
             ->when($request->type, fn ($q) => $q->where('type', $request->type))
             ->when($request->product_id, fn ($q) => $q->where('product_id', $request->product_id))
             ->when($request->date_from, fn ($q) => $q->whereDate('movement_date', '>=', $request->date_from))
@@ -30,9 +29,9 @@ class StockMovementController extends Controller
     public function createIn()
     {
         $products = Product::where('active', true)->orderBy('name')->get();
-        $suppliers = Supplier::where('active', true)->orderBy('name')->get();
+        $accounts = Account::where('active', true)->whereIn('type', ['supplier', 'other'])->orderBy('name')->get();
 
-        return view('stock-movements.in', compact('products', 'suppliers'));
+        return view('stock-movements.in', compact('products', 'accounts'));
     }
 
     public function storeIn(Request $request)
@@ -41,10 +40,18 @@ class StockMovementController extends Controller
             'product_id' => ['required', 'exists:products,id'],
             'quantity' => ['required', 'integer', 'min:1'],
             'unit_price' => ['nullable', 'numeric', 'min:0'],
-            'supplier_id' => ['nullable', 'exists:suppliers,id'],
+            'account_id' => ['nullable', 'exists:accounts,id'],
             'note' => ['nullable', 'string', 'max:255'],
             'movement_date' => ['nullable', 'date'],
         ]);
+
+        if (! empty($data['account_id'])) {
+            $account = Account::findOrFail($data['account_id']);
+
+            if (! in_array($account->type, ['supplier', 'other'])) {
+                return back()->withInput()->withErrors(['account_id' => 'Stok girişi için tedarikçi veya diğer tipinde bir cari seçilmelidir.']);
+            }
+        }
 
         DB::transaction(function () use ($data, $request) {
             $product = Product::lockForUpdate()->findOrFail($data['product_id']);
@@ -55,7 +62,7 @@ class StockMovementController extends Controller
                 'quantity' => $data['quantity'],
                 'unit_price' => $data['unit_price'] ?? 0,
                 'currency' => $product->currency,
-                'supplier_id' => $data['supplier_id'] ?? null,
+                'account_id' => $data['account_id'] ?? null,
                 'user_id' => $request->user()->id,
                 'note' => $data['note'] ?? null,
                 'movement_date' => $data['movement_date'] ?? now(),
@@ -70,9 +77,9 @@ class StockMovementController extends Controller
     public function createOut()
     {
         $products = Product::where('active', true)->orderBy('name')->get();
-        $customers = Customer::where('active', true)->orderBy('name')->get();
+        $accounts = Account::where('active', true)->whereIn('type', ['customer', 'other'])->orderBy('name')->get();
 
-        return view('stock-movements.out', compact('products', 'customers'));
+        return view('stock-movements.out', compact('products', 'accounts'));
     }
 
     public function storeOut(Request $request)
@@ -81,10 +88,18 @@ class StockMovementController extends Controller
             'product_id' => ['required', 'exists:products,id'],
             'quantity' => ['required', 'integer', 'min:1'],
             'unit_price' => ['nullable', 'numeric', 'min:0'],
-            'customer_id' => ['nullable', 'exists:customers,id'],
+            'account_id' => ['nullable', 'exists:accounts,id'],
             'note' => ['nullable', 'string', 'max:255'],
             'movement_date' => ['nullable', 'date'],
         ]);
+
+        if (! empty($data['account_id'])) {
+            $account = Account::findOrFail($data['account_id']);
+
+            if (! in_array($account->type, ['customer', 'other'])) {
+                return back()->withInput()->withErrors(['account_id' => 'Stok çıkışı için müşteri veya diğer tipinde bir cari seçilmelidir.']);
+            }
+        }
 
         $error = null;
 
@@ -103,7 +118,7 @@ class StockMovementController extends Controller
                 'quantity' => $data['quantity'],
                 'unit_price' => $data['unit_price'] ?? 0,
                 'currency' => $product->currency,
-                'customer_id' => $data['customer_id'] ?? null,
+                'account_id' => $data['account_id'] ?? null,
                 'user_id' => $request->user()->id,
                 'note' => $data['note'] ?? null,
                 'movement_date' => $data['movement_date'] ?? now(),

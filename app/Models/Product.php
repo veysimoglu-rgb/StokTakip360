@@ -37,8 +37,31 @@ class Product extends Model
         return $this->hasMany(StockMovement::class);
     }
 
+    public function saleItems()
+    {
+        return $this->hasMany(SaleItem::class);
+    }
+
+    public function purchaseItems()
+    {
+        return $this->hasMany(PurchaseItem::class);
+    }
+
     public function scopeLowStock($query)
     {
         return $query->whereColumn('current_stock', '<=', 'min_stock');
+    }
+
+    /**
+     * Same threshold as scopeLowStock(), plus a distinct "out of stock" state
+     * for the product detail page's status badge.
+     */
+    public function stockStatusLabel(): string
+    {
+        return match (true) {
+            $this->current_stock <= 0 => 'Tükendi',
+            $this->current_stock <= $this->min_stock => 'Kritik',
+            default => 'Stokta',
+        };
     }
 }

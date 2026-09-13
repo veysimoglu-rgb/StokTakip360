@@ -2,14 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Account;
 use App\Models\Category;
-use App\Models\Customer;
 use App\Models\Product;
 use App\Models\StockMovement;
-use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -148,26 +146,26 @@ class MovementValueReportFiltersTest extends TestCase
         $this->assertFalse($byCategoryNames->contains('ProductInCatA'));
     }
 
-    public function test_customer_and_supplier_filters(): void
+    public function test_account_filter(): void
     {
-        $customer = Customer::create(['name' => 'Test Müşteri']);
-        $supplier = Supplier::create(['name' => 'Test Tedarikçi']);
+        $customerAccount = Account::factory()->create(['type' => 'customer', 'name' => 'Test Müşteri']);
+        $supplierAccount = Account::factory()->create(['type' => 'supplier', 'name' => 'Test Tedarikçi']);
         $product = Product::factory()->create();
 
         StockMovement::create([
             'product_id' => $product->id, 'type' => 'out', 'quantity' => 2,
-            'unit_price' => 20, 'currency' => 'TL', 'customer_id' => $customer->id, 'movement_date' => now(),
+            'unit_price' => 20, 'currency' => 'TL', 'account_id' => $customerAccount->id, 'movement_date' => now(),
         ]);
         StockMovement::create([
             'product_id' => $product->id, 'type' => 'in', 'quantity' => 3,
-            'unit_price' => 15, 'currency' => 'TL', 'supplier_id' => $supplier->id, 'movement_date' => now(),
+            'unit_price' => 15, 'currency' => 'TL', 'account_id' => $supplierAccount->id, 'movement_date' => now(),
         ]);
 
-        $byCustomer = $this->actingAs($this->admin())->get("/reports/movement-value?customer_id={$customer->id}&period=this_month");
+        $byCustomer = $this->actingAs($this->admin())->get("/reports/movement-value?account_id={$customerAccount->id}&period=this_month");
         $this->assertSame(2, $byCustomer->viewData('qtyTotals')->get('out'));
         $this->assertNull($byCustomer->viewData('qtyTotals')->get('in'));
 
-        $bySupplier = $this->actingAs($this->admin())->get("/reports/movement-value?supplier_id={$supplier->id}&period=this_month");
+        $bySupplier = $this->actingAs($this->admin())->get("/reports/movement-value?account_id={$supplierAccount->id}&period=this_month");
         $this->assertSame(3, $bySupplier->viewData('qtyTotals')->get('in'));
         $this->assertNull($bySupplier->viewData('qtyTotals')->get('out'));
     }

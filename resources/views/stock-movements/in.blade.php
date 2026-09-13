@@ -30,13 +30,14 @@
             </div>
 
             <div>
-                <x-input-label for="supplier_id" value="Tedarikçi (opsiyonel)" />
-                <x-select-input id="supplier_id" name="supplier_id" class="w-full">
+                <x-input-label for="account_id" value="Tedarikçi (opsiyonel)" />
+                <x-select-input id="account_id" name="account_id" class="w-full">
                     <option value="">Seçiniz</option>
-                    @foreach ($suppliers as $supplier)
-                        <option value="{{ $supplier->id }}" @selected(old('supplier_id') == $supplier->id)>{{ $supplier->name }}</option>
+                    @foreach ($accounts as $account)
+                        <option value="{{ $account->id }}" @selected(old('account_id') == $account->id)>{{ $account->name }}</option>
                     @endforeach
                 </x-select-input>
+                <x-input-error :messages="$errors->get('account_id')" class="mt-1" />
             </div>
 
             <div>

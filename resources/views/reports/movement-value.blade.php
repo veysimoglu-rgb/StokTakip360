@@ -52,16 +52,10 @@
                 <option value="{{ $category->id }}" @selected(request('category_id') == $category->id)>{{ $category->name }}</option>
             @endforeach
         </x-select-input>
-        <x-select-input name="customer_id" class="w-40">
-            <option value="">Tüm Müşteriler</option>
-            @foreach ($customers as $customer)
-                <option value="{{ $customer->id }}" @selected(request('customer_id') == $customer->id)>{{ $customer->name }}</option>
-            @endforeach
-        </x-select-input>
-        <x-select-input name="supplier_id" class="w-40">
-            <option value="">Tüm Tedarikçiler</option>
-            @foreach ($suppliers as $supplier)
-                <option value="{{ $supplier->id }}" @selected(request('supplier_id') == $supplier->id)>{{ $supplier->name }}</option>
+        <x-select-input name="account_id" class="w-40">
+            <option value="">Tüm Cariler</option>
+            @foreach ($accounts as $account)
+                <option value="{{ $account->id }}" @selected(request('account_id') == $account->id)>{{ $account->name }}</option>
             @endforeach
         </x-select-input>
         <x-secondary-button type="submit">Filtrele</x-secondary-button>

@@ -14,5 +14,25 @@
             <h3 class="font-semibold text-gray-800">Stok Hareketi Değer Raporu</h3>
             <p class="text-sm text-gray-500 mt-1">Hareketlerin kayıtlı fiyatına göre parasal değeri.</p>
         </a>
+        <a href="{{ route('reports.sales') }}" class="bg-white rounded-lg shadow p-6 hover:shadow-md transition">
+            <h3 class="font-semibold text-gray-800">Satış Raporu</h3>
+            <p class="text-sm text-gray-500 mt-1">Tarih, cari ve ödeme durumuna göre satış listesi ve toplamlar.</p>
+        </a>
+        <a href="{{ route('reports.purchases') }}" class="bg-white rounded-lg shadow p-6 hover:shadow-md transition">
+            <h3 class="font-semibold text-gray-800">Alış Raporu</h3>
+            <p class="text-sm text-gray-500 mt-1">Tarih, cari ve ödeme durumuna göre alış listesi ve toplamlar.</p>
+        </a>
+        <a href="{{ route('reports.account-statement') }}" class="bg-white rounded-lg shadow p-6 hover:shadow-md transition">
+            <h3 class="font-semibold text-gray-800">Cari Ekstre</h3>
+            <p class="text-sm text-gray-500 mt-1">Bir carinin tarih aralıklı borç/alacak/bakiye dökümü.</p>
+        </a>
+        <a href="{{ route('reports.cash') }}" class="bg-white rounded-lg shadow p-6 hover:shadow-md transition">
+            <h3 class="font-semibold text-gray-800">Kasa Raporu</h3>
+            <p class="text-sm text-gray-500 mt-1">Tarih aralıklı toplam giriş, çıkış ve net değişim.</p>
+        </a>
+        <a href="{{ route('reports.profitability') }}" class="bg-white rounded-lg shadow p-6 hover:shadow-md transition">
+            <h3 class="font-semibold text-gray-800">Kârlılık Raporu</h3>
+            <p class="text-sm text-gray-500 mt-1">Tarih aralıklı toplam ciro, maliyet, brüt kâr ve ürün bazlı performans.</p>
+        </a>
     </div>
 </x-app-layout>

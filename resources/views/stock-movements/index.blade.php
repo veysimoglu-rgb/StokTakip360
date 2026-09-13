@@ -50,7 +50,7 @@
                             @endif
                         </td>
                         <td class="px-4 py-3 text-right">{{ $movement->quantity }}</td>
-                        <td class="px-4 py-3">{{ $movement->customer?->name ?? $movement->supplier?->name ?? '-' }}</td>
+                        <td class="px-4 py-3">{{ $movement->account?->name ?? '-' }}</td>
                         <td class="px-4 py-3">{{ $movement->user?->name ?? '-' }}</td>
                         <td class="px-4 py-3 text-gray-500">{{ $movement->note ?? '-' }}</td>
                     </tr>

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $title ?? 'Dashboard' }} - {{ config('app.name') }}</title>
+    <title>{{ $title ?? 'Ana Sayfa' }} - {{ config('app.name') }}</title>
 
     <link rel="manifest" href="{{ asset('manifest.json') }}">
     <meta name="theme-color" content="#4f46e5">
@@ -61,6 +61,42 @@
                 </div>
 
                 <div>
+                    <p class="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">Satış</p>
+                    <div class="space-y-1">
+                        <x-sidebar-link :href="route('sales.index')" :active="request()->routeIs('sales.*')">
+                            Satışlar
+                        </x-sidebar-link>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">Alış</p>
+                    <div class="space-y-1">
+                        <x-sidebar-link :href="route('purchases.index')" :active="request()->routeIs('purchases.*')">
+                            Alışlar
+                        </x-sidebar-link>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">Cari</p>
+                    <div class="space-y-1">
+                        <x-sidebar-link :href="route('accounts.index')" :active="request()->routeIs('accounts.*')">
+                            Cari Hesaplar
+                        </x-sidebar-link>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">Kasa</p>
+                    <div class="space-y-1">
+                        <x-sidebar-link :href="route('cash.index')" :active="request()->routeIs('cash.*')">
+                            Kasa
+                        </x-sidebar-link>
+                    </div>
+                </div>
+
+                <div>
                     <p class="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">Raporlar</p>
                     <div class="space-y-1">
                         <x-sidebar-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
@@ -78,12 +114,6 @@
                         </x-sidebar-link>
                         <x-sidebar-link :href="route('brands.index')" :active="request()->routeIs('brands.*')">
                             Markalar
-                        </x-sidebar-link>
-                        <x-sidebar-link :href="route('customers.index')" :active="request()->routeIs('customers.*')">
-                            Müşteriler
-                        </x-sidebar-link>
-                        <x-sidebar-link :href="route('suppliers.index')" :active="request()->routeIs('suppliers.*')">
-                            Tedarikçiler
                         </x-sidebar-link>
                     </div>
                 </div>
@@ -122,12 +152,12 @@
         <!-- Main content -->
         <div class="flex-1 flex flex-col min-w-0">
             <header class="h-16 bg-white border-b flex items-center justify-between px-4 lg:px-8">
-                <button @click="sidebarOpen = true" class="lg:hidden text-gray-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <button @click="sidebarOpen = true" class="lg:hidden text-gray-600 p-2.5 -m-2.5 rounded-md active:bg-gray-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                 </button>
-                <h1 class="text-lg font-semibold text-gray-800">{{ $title ?? 'Dashboard' }}</h1>
+                <h1 class="text-lg font-semibold text-gray-800">{{ $title ?? 'Ana Sayfa' }}</h1>
                 <div class="w-6 lg:hidden"></div>
             </header>
 
@@ -145,6 +175,12 @@
 
                 {{ $slot }}
             </main>
+
+            <footer class="border-t bg-white px-4 lg:px-8 py-2 sm:py-3 text-center">
+                <p class="text-[11px] sm:text-xs text-gray-400 truncate">
+                    StokTakip360 © {{ date('Y') }} — Geliştiren: {{ \App\Models\Setting::get('company_name', 'Mikrolens Bilişim & Güvenlik Sistemleri') }}
+                </p>
+            </footer>
         </div>
     </div>
 </body>

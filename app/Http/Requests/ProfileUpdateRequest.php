@@ -28,4 +28,21 @@ class ProfileUpdateRequest extends FormRequest
             ],
         ];
     }
+
+    /**
+     * Get the custom validation messages, in Turkish, for the fields above.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'Ad Soyad alanı zorunludur.',
+            'name.max' => 'Ad Soyad en fazla 255 karakter olabilir.',
+            'email.required' => 'E-posta alanı zorunludur.',
+            'email.email' => 'Geçerli bir e-posta adresi girin.',
+            'email.max' => 'E-posta en fazla 255 karakter olabilir.',
+            'email.unique' => 'Bu e-posta adresi zaten kullanılıyor.',
+        ];
+    }
 }

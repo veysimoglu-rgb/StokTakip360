@@ -1,8 +1,8 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "mikrolens/stoktakip360",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "StokTakip360 stock tracking application.",
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {

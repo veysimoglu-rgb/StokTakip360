@@ -1,0 +1,66 @@
+<x-app-layout>
+    <x-slot name="title">Yeni Cari Hesap</x-slot>
+
+    <div class="bg-white rounded-lg shadow p-6 max-w-lg">
+        <form method="POST" action="{{ route('accounts.store') }}" class="space-y-4">
+            @csrf
+            <div>
+                <x-input-label for="type" value="Cari Tipi" />
+                <x-select-input id="type" name="type" class="w-full">
+                    @foreach (\App\Models\Account::TYPES as $value => $label)
+                        <option value="{{ $value }}" @selected(old('type') === $value)>{{ $label }}</option>
+                    @endforeach
+                </x-select-input>
+                <x-input-error :messages="$errors->get('type')" class="mt-1" />
+            </div>
+            <div>
+                <x-input-label for="name" value="Firma / Kişi Adı" />
+                <x-text-input id="name" name="name" value="{{ old('name') }}" class="w-full" required autofocus />
+                <x-input-error :messages="$errors->get('name')" class="mt-1" />
+            </div>
+            <div>
+                <x-input-label for="contact_person" value="Yetkili Kişi" />
+                <x-text-input id="contact_person" name="contact_person" value="{{ old('contact_person') }}" class="w-full" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <x-input-label for="phone" value="Telefon" />
+                    <x-text-input id="phone" name="phone" value="{{ old('phone') }}" class="w-full" />
+                </div>
+                <div>
+                    <x-input-label for="email" value="E-posta" />
+                    <x-text-input id="email" type="email" name="email" value="{{ old('email') }}" class="w-full" />
+                    <x-input-error :messages="$errors->get('email')" class="mt-1" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <x-input-label for="tax_office" value="Vergi Dairesi" />
+                    <x-text-input id="tax_office" name="tax_office" value="{{ old('tax_office') }}" class="w-full" />
+                </div>
+                <div>
+                    <x-input-label for="tax_no" value="Vergi Numarası" />
+                    <x-text-input id="tax_no" name="tax_no" value="{{ old('tax_no') }}" class="w-full" />
+                </div>
+            </div>
+            <div>
+                <x-input-label for="address" value="Adres" />
+                <x-textarea-input id="address" name="address" rows="2">{{ old('address') }}</x-textarea-input>
+            </div>
+            <div>
+                <x-input-label for="note" value="Not" />
+                <x-textarea-input id="note" name="note" rows="2">{{ old('note') }}</x-textarea-input>
+            </div>
+
+            <label class="inline-flex items-center">
+                <input type="checkbox" name="active" value="1" checked class="rounded border-gray-300 text-indigo-600">
+                <span class="ms-2 text-sm text-gray-700">Aktif</span>
+            </label>
+
+            <div class="flex gap-3 pt-2">
+                <x-primary-button>Kaydet</x-primary-button>
+                <a href="{{ route('accounts.index') }}" class="text-sm text-gray-600 self-center hover:underline">Vazgeç</a>
+            </div>
+        </form>
+    </div>
+</x-app-layout>

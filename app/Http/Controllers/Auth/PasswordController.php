@@ -18,6 +18,12 @@ class PasswordController extends Controller
         $validated = $request->validateWithBag('updatePassword', [
             'current_password' => ['required', 'current_password'],
             'password' => ['required', Password::defaults(), 'confirmed'],
+        ], [
+            'current_password.required' => 'Mevcut şifre alanı zorunludur.',
+            'current_password.current_password' => 'Girilen mevcut şifre doğru değil.',
+            'password.required' => 'Yeni şifre alanı zorunludur.',
+            'password.confirmed' => 'Yeni şifre tekrarı eşleşmiyor.',
+            'password.min' => 'Yeni şifre en az 8 karakter olmalıdır.',
         ]);
 
         $request->user()->update([
