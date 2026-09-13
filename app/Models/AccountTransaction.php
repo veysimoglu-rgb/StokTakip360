@@ -32,7 +32,7 @@ class AccountTransaction extends Model
     protected $fillable = [
         'account_id', 'type', 'direction', 'amount', 'currency', 'description',
         'transaction_date', 'user_id', 'reversal_of_id', 'cancelled_at',
-        'source_type', 'source_id',
+        'source_type', 'source_id', 'applies_to_type', 'applies_to_id',
     ];
 
     protected $casts = [
@@ -62,6 +62,16 @@ class AccountTransaction extends Model
     }
 
     public function source()
+    {
+        return $this->morphTo();
+    }
+
+    /**
+     * Which open Sale/Purchase (if any) this manual collection/payment was
+     * applied against — independent of `source`, which for these rows
+     * already means "the paired cash_transaction" (see WP-10e).
+     */
+    public function appliesTo()
     {
         return $this->morphTo();
     }

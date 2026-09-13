@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\AccountTransaction;
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
@@ -263,5 +264,90 @@ class AccountTest extends TestCase
     public function test_non_admin_cannot_view_the_account_create_form(): void
     {
         $this->actingAs($this->personel())->get('/accounts/create')->assertForbidden();
+    }
+
+    private function product(int $stock = 100, float $price = 50): Product
+    {
+        return Product::factory()->create(['current_stock' => $stock, 'sale_price' => $price, 'purchase_price' => $price, 'currency' => 'TL']);
+    }
+
+    // WP-10d: Cari listesindeki vade uyarısı — Sale::overdue()/Purchase::overdue()
+    // ile birebir aynı kural (due_date geçmiş + paid_amount < total + iptal değil).
+    public function test_account_with_an_overdue_unpaid_sale_shows_the_warning_badge(): void
+    {
+        $admin = $this->admin();
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product();
+
+        $this->actingAs($admin)->post('/sales', [
+            'account_id' => $customer->id,
+            'payment_type' => 'vadeli',
+            'due_date' => now()->subDays(5)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 50]],
+        ]);
+
+        $response = $this->actingAs($admin)->get('/accounts');
+
+        $response->assertOk();
+        $response->assertSee('Vadesi geçmiş bakiye var', false);
+    }
+
+    public function test_account_with_an_overdue_unpaid_purchase_shows_the_warning_badge(): void
+    {
+        $admin = $this->admin();
+        $supplier = Account::factory()->create(['type' => 'supplier']);
+        $product = $this->product(stock: 0);
+
+        $this->actingAs($admin)->post('/purchases', [
+            'account_id' => $supplier->id,
+            'payment_type' => 'vadeli',
+            'due_date' => now()->subDays(3)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 50]],
+        ]);
+
+        $response = $this->actingAs($admin)->get('/accounts');
+
+        $response->assertOk();
+        $response->assertSee('Vadesi geçmiş bakiye var', false);
+    }
+
+    public function test_account_with_a_fully_paid_past_due_sale_shows_no_warning_badge(): void
+    {
+        $admin = $this->admin();
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product();
+
+        // pesin always pays in full at creation, so remaining() is 0 even
+        // though due_date is in the past — scopeOverdue() correctly excludes it.
+        $this->actingAs($admin)->post('/sales', [
+            'account_id' => $customer->id,
+            'payment_type' => 'pesin',
+            'due_date' => now()->subDays(5)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 50]],
+        ]);
+
+        $response = $this->actingAs($admin)->get('/accounts');
+
+        $response->assertOk();
+        $response->assertDontSee('Vadesi geçmiş bakiye var', false);
+    }
+
+    public function test_account_with_a_not_yet_due_sale_shows_no_warning_badge(): void
+    {
+        $admin = $this->admin();
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product();
+
+        $this->actingAs($admin)->post('/sales', [
+            'account_id' => $customer->id,
+            'payment_type' => 'vadeli',
+            'due_date' => now()->addDays(10)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 50]],
+        ]);
+
+        $response = $this->actingAs($admin)->get('/accounts');
+
+        $response->assertOk();
+        $response->assertDontSee('Vadesi geçmiş bakiye var', false);
     }
 }

@@ -73,11 +73,45 @@ class AccountTransactionController extends Controller
                         $linkedCash->cancel($request->user(), 'İlişkili cari hareket iptal edildi: '.$accountTransaction->typeLabel());
                     }
                 }
+
+                $this->reverseAppliedPayment($accountTransaction);
             });
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
 
         return back()->with('success', 'Hareket iptal edildi.');
+    }
+
+    /**
+     * If this manual collection/payment (WP-10e) had been applied against a
+     * specific open Sale/Purchase, cancelling it must give that amount back
+     * to the document's remaining balance — otherwise paid_amount would stay
+     * inflated after the money that funded it was reversed.
+     */
+    private function reverseAppliedPayment(AccountTransaction $accountTransaction): void
+    {
+        if (! $accountTransaction->applies_to_type || ! $accountTransaction->applies_to_id) {
+            return;
+        }
+
+        $document = $accountTransaction->applies_to_type::find($accountTransaction->applies_to_id);
+
+        if (! $document) {
+            return;
+        }
+
+        $document->decrement('paid_amount', $accountTransaction->amount);
+        $document->refresh();
+
+        $paidAmount = (float) $document->paid_amount;
+
+        $document->update([
+            'status' => match (true) {
+                $paidAmount <= 0 => 'unpaid',
+                $document->remaining() <= 0 => 'paid',
+                default => 'partial',
+            },
+        ]);
     }
 }

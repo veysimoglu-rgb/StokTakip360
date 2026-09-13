@@ -51,6 +51,14 @@
                         <td class="px-4 py-3 font-mono text-xs">{{ $account->code }}</td>
                         <td class="px-4 py-3">
                             {{ $account->name }}
+                            @if ($overdueAccountIds->contains($account->id))
+                                <span class="inline-flex align-middle ms-1 text-red-600" title="Vadesi geçmiş bakiye var">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 3.5h.01" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.6 4.6 2.9 18a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.4 4.6a2 2 0 0 0-2.8 0Z" />
+                                    </svg>
+                                </span>
+                            @endif
                             <p class="sm:hidden text-xs text-gray-400 mt-0.5">{{ $account->typeLabel() }}{{ $account->phone ? ' · '.$account->phone : '' }}</p>
                         </td>
                         <td class="hidden sm:table-cell px-4 py-3">

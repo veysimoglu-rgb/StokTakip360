@@ -118,6 +118,20 @@
                                 @endforeach
                             </x-select-input>
                         </div>
+                        @if ($openSales->isNotEmpty())
+                            <div>
+                                <x-input-label for="collect_sale_id" value="Hangi satışa işlensin? (opsiyonel)" />
+                                <x-select-input id="collect_sale_id" name="sale_id" class="w-full">
+                                    <option value="">Belirli bir satışa bağlama (genel tahsilat)</option>
+                                    @foreach ($openSales as $sale)
+                                        <option value="{{ $sale->id }}">
+                                            {{ $sale->number }} — Kalan: {{ \App\Support\Currency::format($sale->remaining(), $sale->currency) }} ({{ $sale->currency }})
+                                        </option>
+                                    @endforeach
+                                </x-select-input>
+                                <x-input-error :messages="$errors->get('sale_id')" class="mt-1" />
+                            </div>
+                        @endif
                         <div>
                             <x-input-label for="collect_description" value="Açıklama" />
                             <x-text-input id="collect_description" name="description" class="w-full" />
@@ -151,6 +165,20 @@
                                 @endforeach
                             </x-select-input>
                         </div>
+                        @if ($openPurchases->isNotEmpty())
+                            <div>
+                                <x-input-label for="pay_purchase_id" value="Hangi alışa işlensin? (opsiyonel)" />
+                                <x-select-input id="pay_purchase_id" name="purchase_id" class="w-full">
+                                    <option value="">Belirli bir alışa bağlama (genel ödeme)</option>
+                                    @foreach ($openPurchases as $purchase)
+                                        <option value="{{ $purchase->id }}">
+                                            {{ $purchase->number }} — Kalan: {{ \App\Support\Currency::format($purchase->remaining(), $purchase->currency) }} ({{ $purchase->currency }})
+                                        </option>
+                                    @endforeach
+                                </x-select-input>
+                                <x-input-error :messages="$errors->get('purchase_id')" class="mt-1" />
+                            </div>
+                        @endif
                         <div>
                             <x-input-label for="pay_description" value="Açıklama" />
                             <x-text-input id="pay_description" name="description" class="w-full" />

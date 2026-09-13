@@ -114,6 +114,7 @@ class CashTransactionController extends Controller
 
                     if ($linkedAccount && ! $linkedAccount->isCancelled()) {
                         $linkedAccount->cancel($request->user(), 'İlişkili kasa hareketi iptal edildi: '.$cashTransaction->typeLabel());
+                        $this->reverseAppliedPayment($linkedAccount);
                     }
                 }
             });
@@ -122,5 +123,38 @@ class CashTransactionController extends Controller
         }
 
         return back()->with('success', 'Hareket iptal edildi.');
+    }
+
+    /**
+     * If the account_transaction paired with this cash row had been applied
+     * (WP-10e) against a specific open Sale/Purchase, cancelling it here
+     * must give that amount back to the document's remaining balance —
+     * otherwise paid_amount would stay inflated after the money that funded
+     * it was reversed.
+     */
+    private function reverseAppliedPayment(AccountTransaction $accountTransaction): void
+    {
+        if (! $accountTransaction->applies_to_type || ! $accountTransaction->applies_to_id) {
+            return;
+        }
+
+        $document = $accountTransaction->applies_to_type::find($accountTransaction->applies_to_id);
+
+        if (! $document) {
+            return;
+        }
+
+        $document->decrement('paid_amount', $accountTransaction->amount);
+        $document->refresh();
+
+        $paidAmount = (float) $document->paid_amount;
+
+        $document->update([
+            'status' => match (true) {
+                $paidAmount <= 0 => 'unpaid',
+                $document->remaining() <= 0 => 'paid',
+                default => 'partial',
+            },
+        ]);
     }
 }

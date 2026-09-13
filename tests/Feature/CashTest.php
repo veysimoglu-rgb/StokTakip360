@@ -5,6 +5,9 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\AccountTransaction;
 use App\Models\CashTransaction;
+use App\Models\Product;
+use App\Models\Purchase;
+use App\Models\Sale;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
@@ -302,5 +305,345 @@ class CashTest extends TestCase
 
         $this->assertSame(1, AccountTransaction::count());
         $this->assertSame(1, CashTransaction::count());
+    }
+
+    private function product(string $currency = 'TL', int $stock = 10, float $price = 300): Product
+    {
+        return Product::factory()->create(['current_stock' => $stock, 'sale_price' => $price, 'purchase_price' => $price, 'currency' => $currency]);
+    }
+
+    // ===================== WP-10e: Tahsilat/Ödeme -> Sale/Purchase.paid_amount =====================
+
+    // 1. Tam tahsilat: 300 TL satış, 225 TL peşin kısmi ödenmiş, vadesi geçmiş
+    // (overdue). Kalan 75 TL'yi bu satışa bağlı tahsil edince: paid_amount
+    // 300'e çıkmalı, status "paid" olmalı, Sale::overdue() artık bu satışı
+    // döndürmemeli ve Cari listesindeki (WP-10d) ⚠️ rozeti kalkmalı.
+    public function test_collection_applied_to_a_sale_fully_closes_it_and_clears_overdue_and_badge(): void
+    {
+        $admin = $this->admin();
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product();
+
+        $this->actingAs($admin)->post('/sales', [
+            'account_id' => $customer->id,
+            'payment_type' => 'kismi',
+            'paid_amount' => 225,
+            'due_date' => now()->subDays(3)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 300]],
+        ]);
+        $sale = Sale::first();
+
+        $this->assertTrue(Sale::overdue()->whereKey($sale->id)->exists());
+        $this->actingAs($admin)->get('/accounts')->assertSee('Vadesi geçmiş bakiye var', false);
+
+        $response = $this->actingAs($admin)->post("/accounts/{$customer->id}/collect", [
+            'amount' => 75,
+            'sale_id' => $sale->id,
+        ]);
+
+        $response->assertRedirect();
+        $sale->refresh();
+        $this->assertSame(300.0, (float) $sale->paid_amount);
+        $this->assertSame('paid', $sale->status);
+        $this->assertSame(0.0, $sale->remaining());
+        $this->assertFalse(Sale::overdue()->whereKey($sale->id)->exists());
+        $this->actingAs($admin)->get('/accounts')->assertDontSee('Vadesi geçmiş bakiye var', false);
+        // 225 (the sale's own initial "kismi" payment leg) + 75 (this collection).
+        $this->assertSame(300.0, CashTransaction::balance());
+
+        $accountTransaction = AccountTransaction::where('type', 'collection')->latest('id')->first();
+        $this->assertSame(Sale::class, $accountTransaction->applies_to_type);
+        $this->assertSame($sale->id, $accountTransaction->applies_to_id);
+    }
+
+    // 2. Kısmi tahsilat: belgeye bağlı olsa da kalanın tamamı kapanmayabilir.
+    public function test_collection_applied_to_a_sale_can_partially_reduce_it(): void
+    {
+        $admin = $this->admin();
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product();
+
+        $this->actingAs($admin)->post('/sales', [
+            'account_id' => $customer->id,
+            'payment_type' => 'kismi',
+            'paid_amount' => 225,
+            'due_date' => now()->addDays(10)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 300]],
+        ]);
+        $sale = Sale::first();
+
+        $this->actingAs($admin)->post("/accounts/{$customer->id}/collect", [
+            'amount' => 50,
+            'sale_id' => $sale->id,
+        ]);
+
+        $sale->refresh();
+        $this->assertSame(275.0, (float) $sale->paid_amount);
+        $this->assertSame(25.0, $sale->remaining());
+        $this->assertSame('partial', $sale->status);
+    }
+
+    // 3. Kalan tutardan fazla tahsilat reddedilir, hiçbir kayıt oluşmaz.
+    public function test_collection_exceeding_the_sales_remaining_balance_is_rejected(): void
+    {
+        $admin = $this->admin();
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product();
+
+        $this->actingAs($admin)->post('/sales', [
+            'account_id' => $customer->id,
+            'payment_type' => 'kismi',
+            'paid_amount' => 225,
+            'due_date' => now()->addDays(10)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 300]],
+        ]);
+        $sale = Sale::first();
+
+        $response = $this->actingAs($admin)->post("/accounts/{$customer->id}/collect", [
+            'amount' => 100,
+            'sale_id' => $sale->id,
+        ]);
+
+        $response->assertSessionHasErrors('sale_id');
+        $this->assertSame(225.0, (float) $sale->fresh()->paid_amount);
+        // Only the sale's own initial "kismi" payment leg exists — the
+        // rejected request added no new row on either ledger.
+        $this->assertSame(1, AccountTransaction::where('type', 'collection')->count());
+        $this->assertSame(1, CashTransaction::where('type', 'collection')->count());
+    }
+
+    // 4. Farklı para birimindeki bir satışa bağlanamaz.
+    public function test_collection_currency_must_match_the_selected_sales_currency(): void
+    {
+        $admin = $this->admin();
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $usdProduct = $this->product(currency: 'USD', price: 100);
+
+        $this->actingAs($admin)->post('/sales', [
+            'account_id' => $customer->id,
+            'payment_type' => 'vadeli',
+            'due_date' => now()->addDays(10)->toDateString(),
+            'items' => [['product_id' => $usdProduct->id, 'quantity' => 1, 'unit_price' => 100]],
+        ]);
+        $sale = Sale::first();
+
+        $response = $this->actingAs($admin)->post("/accounts/{$customer->id}/collect", [
+            'amount' => 50,
+            'currency' => 'TL',
+            'sale_id' => $sale->id,
+        ]);
+
+        $response->assertSessionHasErrors('sale_id');
+        $this->assertSame(0.0, (float) $sale->fresh()->paid_amount);
+        $this->assertSame(0, AccountTransaction::where('type', 'collection')->count());
+    }
+
+    // 5. Belge seçilmezse mevcut serbest/genel tahsilat davranışı hiç değişmez.
+    public function test_collection_without_a_sale_id_behaves_exactly_as_before(): void
+    {
+        $admin = $this->admin();
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product();
+
+        $this->actingAs($admin)->post('/sales', [
+            'account_id' => $customer->id,
+            'payment_type' => 'kismi',
+            'paid_amount' => 225,
+            'due_date' => now()->addDays(10)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 300]],
+        ]);
+        $sale = Sale::first();
+
+        $response = $this->actingAs($admin)->post("/accounts/{$customer->id}/collect", ['amount' => 500]);
+
+        $response->assertRedirect();
+        // 225 (the sale's own initial "kismi" payment leg) + 500 (this general collection).
+        $this->assertSame(725.0, CashTransaction::balance());
+        // The unrelated open sale must stay completely untouched.
+        $this->assertSame(225.0, (float) $sale->fresh()->paid_amount);
+
+        $accountTransaction = AccountTransaction::where('type', 'collection')->latest('id')->first();
+        $this->assertSame(500.0, (float) $accountTransaction->amount);
+        $this->assertNull($accountTransaction->applies_to_type);
+        $this->assertNull($accountTransaction->applies_to_id);
+    }
+
+    // 6. Bağlı bir tahsilat iptal edilirse paid_amount ve status geri alınır.
+    public function test_cancelling_an_applied_collection_reverses_the_sales_paid_amount(): void
+    {
+        $admin = $this->admin();
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product();
+
+        $this->actingAs($admin)->post('/sales', [
+            'account_id' => $customer->id,
+            'payment_type' => 'vadeli',
+            'due_date' => now()->addDays(10)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 300]],
+        ]);
+        $sale = Sale::first();
+
+        $this->actingAs($admin)->post("/accounts/{$customer->id}/collect", [
+            'amount' => 300,
+            'sale_id' => $sale->id,
+        ]);
+        $this->assertSame('paid', $sale->fresh()->status);
+
+        $accountTransaction = AccountTransaction::where('type', 'collection')->first();
+        $response = $this->actingAs($admin)->post("/account-transactions/{$accountTransaction->id}/cancel");
+
+        $response->assertRedirect();
+        $sale->refresh();
+        $this->assertSame(0.0, (float) $sale->paid_amount);
+        $this->assertSame('unpaid', $sale->status);
+        $this->assertSame(0.0, CashTransaction::balance());
+    }
+
+    // 6b. Aynı iptal, kasa hareketi rotası üzerinden tetiklense bile aynı sonucu vermeli.
+    public function test_cancelling_an_applied_collection_via_the_cash_route_also_reverses_paid_amount(): void
+    {
+        $admin = $this->admin();
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product();
+
+        $this->actingAs($admin)->post('/sales', [
+            'account_id' => $customer->id,
+            'payment_type' => 'vadeli',
+            'due_date' => now()->addDays(10)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 300]],
+        ]);
+        $sale = Sale::first();
+
+        $this->actingAs($admin)->post("/accounts/{$customer->id}/collect", [
+            'amount' => 300,
+            'sale_id' => $sale->id,
+        ]);
+
+        $cashTransaction = CashTransaction::where('type', 'collection')->first();
+        $this->actingAs($admin)->post("/cash-transactions/{$cashTransaction->id}/cancel");
+
+        $sale->refresh();
+        $this->assertSame(0.0, (float) $sale->paid_amount);
+        $this->assertSame('unpaid', $sale->status);
+    }
+
+    // ===================== Purchase/Ödeme tarafının simetrik testleri =====================
+
+    // 7. Ödeme, bir alışa bağlanınca kalanı kapatır ve overdue/rozet kalkar.
+    public function test_payment_applied_to_a_purchase_fully_closes_it_and_clears_overdue_and_badge(): void
+    {
+        $admin = $this->admin();
+        $supplier = Account::factory()->create(['type' => 'supplier']);
+        $product = $this->product(stock: 0);
+        CashTransaction::factory()->create(['type' => 'manual_in', 'direction' => 'in', 'amount' => 1000]);
+
+        $this->actingAs($admin)->post('/purchases', [
+            'account_id' => $supplier->id,
+            'payment_type' => 'kismi',
+            'paid_amount' => 225,
+            'due_date' => now()->subDays(3)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 300]],
+        ]);
+        $purchase = Purchase::first();
+
+        $this->assertTrue(Purchase::overdue()->whereKey($purchase->id)->exists());
+        $this->actingAs($admin)->get('/accounts')->assertSee('Vadesi geçmiş bakiye var', false);
+
+        $response = $this->actingAs($admin)->post("/accounts/{$supplier->id}/pay", [
+            'amount' => 75,
+            'purchase_id' => $purchase->id,
+        ]);
+
+        $response->assertRedirect();
+        $purchase->refresh();
+        $this->assertSame(300.0, (float) $purchase->paid_amount);
+        $this->assertSame('paid', $purchase->status);
+        $this->assertFalse(Purchase::overdue()->whereKey($purchase->id)->exists());
+        $this->actingAs($admin)->get('/accounts')->assertDontSee('Vadesi geçmiş bakiye var', false);
+
+        $accountTransaction = AccountTransaction::where('type', 'payment')->latest('id')->first();
+        $this->assertSame(Purchase::class, $accountTransaction->applies_to_type);
+        $this->assertSame($purchase->id, $accountTransaction->applies_to_id);
+    }
+
+    // 8. Kalanı aşan ödeme reddedilir.
+    public function test_payment_exceeding_the_purchases_remaining_balance_is_rejected(): void
+    {
+        $admin = $this->admin();
+        $supplier = Account::factory()->create(['type' => 'supplier']);
+        $product = $this->product(stock: 0);
+        CashTransaction::factory()->create(['type' => 'manual_in', 'direction' => 'in', 'amount' => 1000]);
+
+        $this->actingAs($admin)->post('/purchases', [
+            'account_id' => $supplier->id,
+            'payment_type' => 'kismi',
+            'paid_amount' => 225,
+            'due_date' => now()->addDays(10)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 300]],
+        ]);
+        $purchase = Purchase::first();
+
+        $response = $this->actingAs($admin)->post("/accounts/{$supplier->id}/pay", [
+            'amount' => 100,
+            'purchase_id' => $purchase->id,
+        ]);
+
+        $response->assertSessionHasErrors('purchase_id');
+        $this->assertSame(225.0, (float) $purchase->fresh()->paid_amount);
+    }
+
+    // 9. Farklı para birimindeki bir alışa bağlanamaz.
+    public function test_payment_currency_must_match_the_selected_purchases_currency(): void
+    {
+        $admin = $this->admin();
+        $supplier = Account::factory()->create(['type' => 'supplier']);
+        $usdProduct = $this->product(currency: 'USD', stock: 0, price: 100);
+
+        $this->actingAs($admin)->post('/purchases', [
+            'account_id' => $supplier->id,
+            'payment_type' => 'vadeli',
+            'due_date' => now()->addDays(10)->toDateString(),
+            'items' => [['product_id' => $usdProduct->id, 'quantity' => 1, 'unit_price' => 100]],
+        ]);
+        $purchase = Purchase::first();
+
+        $response = $this->actingAs($admin)->post("/accounts/{$supplier->id}/pay", [
+            'amount' => 50,
+            'currency' => 'TL',
+            'purchase_id' => $purchase->id,
+        ]);
+
+        $response->assertSessionHasErrors('purchase_id');
+        $this->assertSame(0.0, (float) $purchase->fresh()->paid_amount);
+    }
+
+    // 10. Bağlı bir ödeme iptal edilirse purchase.paid_amount geri alınır.
+    public function test_cancelling_an_applied_payment_reverses_the_purchases_paid_amount(): void
+    {
+        $admin = $this->admin();
+        $supplier = Account::factory()->create(['type' => 'supplier']);
+        $product = $this->product(stock: 0);
+        CashTransaction::factory()->create(['type' => 'manual_in', 'direction' => 'in', 'amount' => 1000]);
+
+        $this->actingAs($admin)->post('/purchases', [
+            'account_id' => $supplier->id,
+            'payment_type' => 'vadeli',
+            'due_date' => now()->addDays(10)->toDateString(),
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 300]],
+        ]);
+        $purchase = Purchase::first();
+
+        $this->actingAs($admin)->post("/accounts/{$supplier->id}/pay", [
+            'amount' => 300,
+            'purchase_id' => $purchase->id,
+        ]);
+        $this->assertSame('paid', $purchase->fresh()->status);
+
+        $accountTransaction = AccountTransaction::where('type', 'payment')->first();
+        $this->actingAs($admin)->post("/account-transactions/{$accountTransaction->id}/cancel");
+
+        $purchase->refresh();
+        $this->assertSame(0.0, (float) $purchase->paid_amount);
+        $this->assertSame('unpaid', $purchase->status);
     }
 }

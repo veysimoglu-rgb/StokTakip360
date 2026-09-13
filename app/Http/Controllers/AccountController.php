@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\AccountTransaction;
+use App\Models\Purchase;
+use App\Models\Sale;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -32,7 +34,21 @@ class AccountController extends Controller
             ->get()
             ->groupBy('account_id');
 
-        return view('accounts.index', compact('accounts', 'balancesByAccount'));
+        // Which of the listed accounts have at least one overdue-and-unpaid
+        // sale or purchase — reuses Sale::overdue()/Purchase::overdue()
+        // as-is (same rule the Dashboard's "Vadesi Geçen" cards use), just
+        // scoped to the accounts on this page and reduced to an id set.
+        $overdueAccountIds = Sale::overdue()
+            ->whereIn('account_id', $accounts->pluck('id'))
+            ->pluck('account_id')
+            ->merge(
+                Purchase::overdue()
+                    ->whereIn('account_id', $accounts->pluck('id'))
+                    ->pluck('account_id')
+            )
+            ->unique();
+
+        return view('accounts.index', compact('accounts', 'balancesByAccount', 'overdueAccountIds'));
     }
 
     public function create()
@@ -60,7 +76,20 @@ class AccountController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return view('accounts.show', compact('account', 'transactions'));
+        // Open (unpaid/partial, not cancelled) documents this account could
+        // apply a Tahsilat/Ödeme against — WP-10e. Mirrors the same
+        // customer/supplier gating the forms below already use, so an
+        // "other" type account (which never has sales/purchases posted
+        // against it in the first place) simply sees an empty list.
+        $openSales = $account->isCustomer()
+            ? Sale::where('account_id', $account->id)->whereColumn('paid_amount', '<', 'total')->whereNull('cancelled_at')->orderByDesc('sale_date')->get()
+            : collect();
+
+        $openPurchases = $account->isSupplier()
+            ? Purchase::where('account_id', $account->id)->whereColumn('paid_amount', '<', 'total')->whereNull('cancelled_at')->orderByDesc('purchase_date')->get()
+            : collect();
+
+        return view('accounts.show', compact('account', 'transactions', 'openSales', 'openPurchases'));
     }
 
     public function edit(Account $account)
