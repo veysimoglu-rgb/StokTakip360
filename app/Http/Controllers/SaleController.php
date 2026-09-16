@@ -70,6 +70,13 @@ class SaleController extends Controller
         return view('sales.show', compact('sale'));
     }
 
+    public function receipt(Sale $sale)
+    {
+        $sale->load(['account', 'items.product']);
+
+        return view('sales.receipt-print', compact('sale'));
+    }
+
     public function cancel(Request $request, Sale $sale)
     {
         try {

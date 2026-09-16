@@ -30,6 +30,7 @@
         </div>
         <div class="flex gap-2">
             <a href="{{ route('sales.index') }}" class="text-sm text-gray-600 self-center hover:underline">← Satışlar</a>
+            <a href="{{ route('sales.receipt', $sale) }}" target="_blank" class="text-sm text-indigo-600 border border-indigo-200 rounded-md px-3 py-1.5 hover:bg-indigo-50 self-center">Fiş Yazdır</a>
             @role('Admin')
             @if (! $sale->isCancelled())
                 <form action="{{ route('sales.cancel', $sale) }}" method="POST" onsubmit="return confirm('Bu satış iptal edilsin mi? Stok, cari ve kasa hareketleri terslenecek.')">
