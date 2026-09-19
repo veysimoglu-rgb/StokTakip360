@@ -10,6 +10,14 @@
     <meta name="theme-color" content="#4f46e5">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        /* App footer: pinned to the bottom of the viewport, starting right of the desktop sidebar
+           (w-64 = 16rem, from 1024px up) and full width below that. The main area reserves bottom
+           space so content is never covered. Plain CSS so it works with any Tailwind build. */
+        .app-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; }
+        main.app-main { padding-bottom: 4.5rem; }
+        @media (min-width: 1024px) { .app-footer { left: 16rem; } }
+    </style>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
@@ -161,7 +169,7 @@
                 <div class="w-6 lg:hidden"></div>
             </header>
 
-            <main class="flex-1 p-4 lg:p-8">
+            <main class="app-main flex-1 p-4 lg:p-8">
                 @if (session('success'))
                     <div class="mb-4 rounded-md bg-green-50 border border-green-200 text-green-800 px-4 py-3 text-sm">
                         {{ session('success') }}
@@ -176,9 +184,9 @@
                 {{ $slot }}
             </main>
 
-            <footer class="border-t bg-white px-4 lg:px-8 py-2 sm:py-3 text-center">
+            <footer class="app-footer border-t bg-white px-4 lg:px-8 py-2 sm:py-3 text-center">
                 <p class="text-[11px] sm:text-xs text-gray-400 truncate">
-                    StokTakip360 © {{ date('Y') }} — Geliştiren: {{ \App\Models\Setting::get('company_name', 'Mikrolens Bilişim & Güvenlik Sistemleri') }}
+                    StokTakip360 © {{ date('Y') }} — Geliştiren: <a href="https://mikrolens.com" target="_blank" rel="noopener noreferrer" class="underline hover:text-gray-600">Mikrolens</a>
                 </p>
             </footer>
         </div>
