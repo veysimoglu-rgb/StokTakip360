@@ -90,7 +90,7 @@
                             <span @class([
                                 'font-medium',
                                 'text-red-600' => $product->current_stock <= $product->min_stock,
-                            ])>{{ $product->current_stock }}</span>
+                            ])>{{ \App\Support\Quantity::format($product->current_stock) }}</span>
                         </td>
                         <td class="hidden sm:table-cell px-4 py-3 text-right">{{ \App\Support\Currency::format($product->sale_price, $product->currency) }}</td>
                         <td class="hidden sm:table-cell px-4 py-3">

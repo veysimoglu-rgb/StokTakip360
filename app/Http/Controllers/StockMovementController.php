@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Support\Quantity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -107,7 +108,7 @@ class StockMovementController extends Controller
             $product = Product::lockForUpdate()->findOrFail($data['product_id']);
 
             if ($product->current_stock < $data['quantity']) {
-                $error = 'Yetersiz stok. Mevcut stok: '.$product->current_stock;
+                $error = 'Yetersiz stok. Mevcut stok: '.Quantity::format($product->current_stock);
 
                 return;
             }

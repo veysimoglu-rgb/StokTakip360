@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\InsufficientStockException;
 use App\Models\Account;
 use App\Models\Product;
 use App\Models\Sale;
@@ -38,29 +39,19 @@ class SaleController extends Controller
     {
         $data = $this->validated($request);
 
-        if (in_array($data['payment_type'], ['vadeli', 'kismi']) && empty($data['account_id'])) {
-            return back()->withErrors(['account_id' => 'Vadeli veya kısmi ödemeli satışlarda cari seçimi zorunludur.'])->withInput();
-        }
-
-        if (in_array($data['payment_type'], ['vadeli', 'kismi']) && empty($data['due_date'])) {
-            return back()->withErrors(['due_date' => 'Vadeli veya kısmi ödemeli satışlarda vade tarihi zorunludur.'])->withInput();
-        }
-
-        if (! empty($data['account_id'])) {
-            $account = Account::findOrFail($data['account_id']);
-
-            if (! in_array($account->type, ['customer', 'other'])) {
-                return back()->withErrors(['account_id' => 'Satış için müşteri veya diğer tipinde bir cari seçilmelidir.'])->withInput();
-            }
+        if ($error = $this->businessRuleError($data)) {
+            return back()->withErrors($error)->withInput();
         }
 
         try {
             $sale = $this->saleService->create($data, $request->user());
+        } catch (InsufficientStockException $e) {
+            return back()->withInput()->with('stock_warning', $e->getMessage())->with('stock_shortages', $e->shortages);
         } catch (RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('sales.show', $sale)->with('success', 'Satış kaydedildi.');
+        return redirect()->route('sales.show', $sale)->with('success', 'Sipariş kaydedildi.');
     }
 
     public function show(Sale $sale)
@@ -68,6 +59,46 @@ class SaleController extends Controller
         $sale->load(['account', 'user', 'items.product', 'debtAccountTransaction', 'paymentAccountTransaction', 'cashTransaction']);
 
         return view('sales.show', compact('sale'));
+    }
+
+    public function edit(Sale $sale)
+    {
+        if ($sale->isCancelled()) {
+            return redirect()->route('sales.show', $sale)->with('error', 'İptal edilmiş bir sipariş düzenlenemez.');
+        }
+
+        $sale->load(['items.product', 'paymentAccountTransaction', 'cashTransaction']);
+
+        // Only the order's own initial payment is editable; money collected
+        // later through the cari screen is preserved by SaleService::update().
+        $initialPaidAmount = (float) ($sale->paymentAccountTransaction?->amount ?? $sale->cashTransaction?->amount ?? 0);
+
+        // An edited order's own products stay selectable even if deactivated.
+        $products = Product::where(fn ($q) => $q->where('active', true)->orWhereIn('id', $sale->items->pluck('product_id')))
+            ->orderBy('name')->get();
+        $accounts = Account::where(fn ($q) => $q->where('active', true)->orWhere('id', $sale->account_id))
+            ->whereIn('type', ['customer', 'other'])->orderBy('name')->get();
+
+        return view('sales.edit', compact('sale', 'products', 'accounts', 'initialPaidAmount'));
+    }
+
+    public function update(Request $request, Sale $sale)
+    {
+        $data = $this->validated($request);
+
+        if ($error = $this->businessRuleError($data)) {
+            return back()->withErrors($error)->withInput();
+        }
+
+        try {
+            $this->saleService->update($sale, $data, $request->user());
+        } catch (InsufficientStockException $e) {
+            return back()->withInput()->with('stock_warning', $e->getMessage())->with('stock_shortages', $e->shortages);
+        } catch (RuntimeException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('sales.show', $sale)->with('success', 'Sipariş güncellendi.');
     }
 
     public function receipt(Sale $sale)
@@ -85,12 +116,36 @@ class SaleController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('sales.show', $sale)->with('success', 'Satış iptal edildi.');
+        return redirect()->route('sales.show', $sale)->with('success', 'Sipariş iptal edildi.');
+    }
+
+    /**
+     * @return array<string, string>|null field => message, or null when fine
+     */
+    private function businessRuleError(array $data): ?array
+    {
+        if (in_array($data['payment_type'], ['vadeli', 'kismi']) && empty($data['account_id'])) {
+            return ['account_id' => 'Vadeli veya kısmi ödemeli siparişlerde cari seçimi zorunludur.'];
+        }
+
+        if (in_array($data['payment_type'], ['vadeli', 'kismi']) && empty($data['due_date'])) {
+            return ['due_date' => 'Vadeli veya kısmi ödemeli siparişlerde vade tarihi zorunludur.'];
+        }
+
+        if (! empty($data['account_id'])) {
+            $account = Account::findOrFail($data['account_id']);
+
+            if (! in_array($account->type, ['customer', 'other'])) {
+                return ['account_id' => 'Sipariş için müşteri veya diğer tipinde bir cari seçilmelidir.'];
+            }
+        }
+
+        return null;
     }
 
     private function validated(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'account_id' => ['nullable', 'exists:accounts,id'],
             'payment_type' => ['required', Rule::in(['pesin', 'vadeli', 'kismi'])],
             // min:0, not min:0.01 — the create form always submits a hidden
@@ -103,10 +158,17 @@ class SaleController extends Controller
             // No after:today constraint — backdated due dates are allowed
             // (entering a historical vadeli sale with a past due date).
             'due_date' => ['nullable', 'date'],
+            'confirm_insufficient_stock' => ['nullable', 'boolean'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            // Up to 3 decimals (matches the decimal(14,3) columns).
+            'items.*.quantity' => ['required', 'numeric', 'min:0.001', 'decimal:0,3'],
+            'items.*.package_qty_input' => ['nullable', 'numeric', 'min:0.001', 'decimal:0,3'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
+
+        $data['confirm_insufficient_stock'] = $request->boolean('confirm_insufficient_stock');
+
+        return $data;
     }
 }

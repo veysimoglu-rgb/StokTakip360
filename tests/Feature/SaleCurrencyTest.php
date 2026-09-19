@@ -69,7 +69,7 @@ class SaleCurrencyTest extends TestCase
         $this->assertDocumentCurrency($sale, 'TL');
         $this->assertSame('paid', $sale->status);
         $this->assertSame(300.0, (float) $sale->total);
-        $this->assertSame(17, $product->fresh()->current_stock);
+        $this->assertSame(17.0, (float) $product->fresh()->current_stock);
         $this->assertSame(300.0, CashTransaction::balanceForCurrency('TL'));
     }
 
@@ -85,7 +85,7 @@ class SaleCurrencyTest extends TestCase
         $sale = Sale::first();
         $this->assertDocumentCurrency($sale, 'USD');
         $this->assertSame(300.0, (float) $sale->total);
-        $this->assertSame(17, $product->fresh()->current_stock);
+        $this->assertSame(17.0, (float) $product->fresh()->current_stock);
         $this->assertSame(300.0, CashTransaction::balanceForCurrency('USD'));
         $this->assertSame(0.0, CashTransaction::balanceForCurrency('TL'));
     }
@@ -102,7 +102,7 @@ class SaleCurrencyTest extends TestCase
         $sale = Sale::first();
         $this->assertDocumentCurrency($sale, 'EUR');
         $this->assertSame(800.0, (float) $sale->total);
-        $this->assertSame(10, $product->fresh()->current_stock);
+        $this->assertSame(10.0, (float) $product->fresh()->current_stock);
         $this->assertSame(800.0, CashTransaction::balanceForCurrency('EUR'));
     }
 
@@ -292,8 +292,8 @@ class SaleCurrencyTest extends TestCase
         $this->assertSame(0, StockMovement::count());
         $this->assertSame(0, AccountTransaction::count());
         $this->assertSame(0, CashTransaction::count());
-        $this->assertSame($stockBefore[0], $usd->fresh()->current_stock);
-        $this->assertSame($stockBefore[1], $eur->fresh()->current_stock);
+        $this->assertSame((float) $stockBefore[0], (float) $usd->fresh()->current_stock);
+        $this->assertSame((float) $stockBefore[1], (float) $eur->fresh()->current_stock);
     }
 
     // --- Reversal preserves currency --------------------------------------
@@ -316,7 +316,7 @@ class SaleCurrencyTest extends TestCase
 
         $this->assertSame(0.0, $customer->fresh()->balanceForCurrency('USD'));
         $this->assertSame(0.0, CashTransaction::balanceForCurrency('USD'));
-        $this->assertSame(50, $product->fresh()->current_stock);
+        $this->assertSame(50.0, (float) $product->fresh()->current_stock);
 
         foreach (AccountTransaction::where('account_id', $customer->id)->get() as $transaction) {
             $this->assertSame('USD', $transaction->currency);
@@ -342,6 +342,6 @@ class SaleCurrencyTest extends TestCase
 
         $this->assertSame(0.0, $customer->fresh()->balanceForCurrency('EUR'));
         $this->assertSame(0.0, CashTransaction::balanceForCurrency('EUR'));
-        $this->assertSame(50, $product->fresh()->current_stock);
+        $this->assertSame(50.0, (float) $product->fresh()->current_stock);
     }
 }

@@ -96,7 +96,7 @@ class MovementValueReportFiltersTest extends TestCase
         $response = $this->actingAs($this->admin())->get('/reports/movement-value?type=in&period=this_month');
 
         $response->assertOk();
-        $this->assertSame(20, $response->viewData('qtyTotals')->get('in'));
+        $this->assertSame(20.0, (float) $response->viewData('qtyTotals')->get('in'));
         $this->assertNull($response->viewData('qtyTotals')->get('out'));
     }
 
@@ -162,11 +162,11 @@ class MovementValueReportFiltersTest extends TestCase
         ]);
 
         $byCustomer = $this->actingAs($this->admin())->get("/reports/movement-value?account_id={$customerAccount->id}&period=this_month");
-        $this->assertSame(2, $byCustomer->viewData('qtyTotals')->get('out'));
+        $this->assertSame(2.0, (float) $byCustomer->viewData('qtyTotals')->get('out'));
         $this->assertNull($byCustomer->viewData('qtyTotals')->get('in'));
 
         $bySupplier = $this->actingAs($this->admin())->get("/reports/movement-value?account_id={$supplierAccount->id}&period=this_month");
-        $this->assertSame(3, $bySupplier->viewData('qtyTotals')->get('in'));
+        $this->assertSame(3.0, (float) $bySupplier->viewData('qtyTotals')->get('in'));
         $this->assertNull($bySupplier->viewData('qtyTotals')->get('out'));
     }
 

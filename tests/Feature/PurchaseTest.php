@@ -55,7 +55,7 @@ class PurchaseTest extends TestCase
         $response->assertRedirect();
         $purchase = Purchase::first();
         $this->assertSame('paid', $purchase->status);
-        $this->assertSame(15, $product->fresh()->current_stock);
+        $this->assertSame(15.0, (float) $product->fresh()->current_stock);
         $this->assertSame(0, AccountTransaction::count());
         $this->assertSame(-500.0, CashTransaction::balance());
         $this->assertSame(Purchase::class, StockMovement::first()->source_type);
@@ -136,7 +136,7 @@ class PurchaseTest extends TestCase
         $this->assertNull($purchase->payment_account_transaction_id);
 
         // Stok doğru değişmeli (alış -> artış).
-        $this->assertSame(3, $product->fresh()->current_stock);
+        $this->assertSame(3.0, (float) $product->fresh()->current_stock);
     }
 
     public function test_credit_purchase_with_zero_paid_amount_still_rolls_back_on_invalid_discount(): void
@@ -157,7 +157,7 @@ class PurchaseTest extends TestCase
         $this->assertSame(0, Purchase::count());
         $this->assertSame(0, StockMovement::count());
         $this->assertSame(0.0, $supplier->fresh()->balance());
-        $this->assertSame(0, $product->fresh()->current_stock);
+        $this->assertSame(0.0, (float) $product->fresh()->current_stock);
     }
 
     /**
@@ -258,8 +258,8 @@ class PurchaseTest extends TestCase
         $purchase = Purchase::first();
         $this->assertSame(2, $purchase->items()->count());
         $this->assertSame(110.0, (float) $purchase->total);
-        $this->assertSame(5, $productA->fresh()->current_stock);
-        $this->assertSame(3, $productB->fresh()->current_stock);
+        $this->assertSame(5.0, (float) $productA->fresh()->current_stock);
+        $this->assertSame(3.0, (float) $productB->fresh()->current_stock);
     }
 
     public function test_discount_greater_than_subtotal_is_rejected(): void
@@ -298,7 +298,7 @@ class PurchaseTest extends TestCase
         $this->assertTrue($purchase->fresh()->isCancelled());
         $this->assertSame(0.0, $supplier->fresh()->balance());
         $this->assertSame(50000.0, CashTransaction::balance());
-        $this->assertSame(0, $product->fresh()->current_stock);
+        $this->assertSame(0.0, (float) $product->fresh()->current_stock);
     }
 
     // Alış iptalinde, o alıştan gelen stok zaten tükenmişse iptal engellenir
@@ -323,7 +323,7 @@ class PurchaseTest extends TestCase
 
         $response->assertSessionHas('error');
         $this->assertFalse($purchase->fresh()->isCancelled());
-        $this->assertSame(0, $product->fresh()->current_stock);
+        $this->assertSame(0.0, (float) $product->fresh()->current_stock);
     }
 
     // 14. Çift iptal engeli
@@ -361,7 +361,7 @@ class PurchaseTest extends TestCase
         $response->assertRedirect();
         $this->assertTrue($purchase->fresh()->isCancelled());
         $this->assertSame(0.0, $supplier->fresh()->balance());
-        $this->assertSame(0, $product->fresh()->current_stock);
+        $this->assertSame(0.0, (float) $product->fresh()->current_stock);
     }
 
     public function test_purchase_rejects_a_customer_type_account(): void

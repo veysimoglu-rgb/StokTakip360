@@ -12,6 +12,7 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockMovement;
 use App\Support\Currency;
+use App\Support\Quantity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -110,7 +111,7 @@ class ReportController extends Controller
                     $movement->product->code,
                     $movement->product->category?->name ?? '-',
                     $movement->type === 'in' ? 'Giriş' : 'Çıkış',
-                    $movement->quantity,
+                    Quantity::format($movement->quantity),
                     $movement->amount() === null ? '' : number_format($movement->unit_price, 2, ',', '.'),
                     $movement->currency ?? 'Bilinmiyor',
                     $movement->amount() === null ? '' : number_format($movement->amount(), 2, ',', '.'),

@@ -11,7 +11,7 @@
                     <option value="">Seçiniz</option>
                     @foreach ($products as $product)
                         <option value="{{ $product->id }}" data-price="{{ $product->purchase_price }}" @selected(old('product_id') == $product->id)>
-                            {{ $product->code }} - {{ $product->name }} (Stok: {{ $product->current_stock }} {{ $product->unit }})
+                            {{ $product->code }} - {{ $product->name }} (Stok: {{ \App\Support\Quantity::format($product->current_stock) }} {{ $product->unit }})
                         </option>
                     @endforeach
                 </x-select-input>

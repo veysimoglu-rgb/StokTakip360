@@ -54,7 +54,7 @@
 
             <div>
                 <x-input-label for="min_stock" value="Minimum Stok" />
-                <x-text-input id="min_stock" type="number" min="0" name="min_stock" value="{{ old('min_stock', 0) }}" class="w-full" required />
+                <x-text-input id="min_stock" type="number" min="0" step="0.001" name="min_stock" value="{{ old('min_stock', 0) }}" class="w-full" required />
                 <x-input-error :messages="$errors->get('min_stock')" class="mt-1" />
             </div>
 
@@ -89,6 +89,41 @@
                 <x-input-label for="vat_rate" value="KDV (%)" />
                 <x-text-input id="vat_rate" type="number" step="0.01" min="0" max="100" name="vat_rate" value="{{ old('vat_rate', $defaultVatRate) }}" class="w-full" required />
                 <x-input-error :messages="$errors->get('vat_rate')" class="mt-1" />
+            </div>
+
+                        <div class="md:col-span-2 border-t pt-4">
+                <p class="text-sm font-semibold text-gray-700">Paketleme (opsiyonel)</p>
+                <p class="text-xs text-gray-500 mt-1">Sipariş balya/koli üzerinden girilecekse doldurun. Stok her zaman ürünün temel birimi (Adet) üzerinden tutulur. Örn: 1 Balya = 15 Paket, 1 Paket = 100 Adet.</p>
+            </div>
+
+            <div>
+                <x-input-label for="package_label" value="Büyük Paket Adı (örn. Balya)" />
+                <x-text-input id="package_label" name="package_label" value="{{ old('package_label', $product->package_label ?? null) }}" class="w-full" />
+                <x-input-error :messages="$errors->get('package_label')" class="mt-1" />
+            </div>
+
+            <div>
+                <x-input-label for="package_qty" value="1 Büyük Paket = kaç küçük paket?" />
+                <x-text-input id="package_qty" type="number" min="1" step="1" name="package_qty" value="{{ old('package_qty', $product->package_qty ?? null) }}" class="w-full" />
+                <x-input-error :messages="$errors->get('package_qty')" class="mt-1" />
+            </div>
+
+            <div>
+                <x-input-label for="subunit_label" value="Küçük Paket Adı (örn. Paket)" />
+                <x-text-input id="subunit_label" name="subunit_label" value="{{ old('subunit_label', $product->subunit_label ?? null) }}" class="w-full" />
+                <x-input-error :messages="$errors->get('subunit_label')" class="mt-1" />
+            </div>
+
+            <div>
+                <x-input-label for="subunit_to_base_qty" value="1 Küçük Paket = kaç Adet?" />
+                <x-text-input id="subunit_to_base_qty" type="number" min="1" step="1" name="subunit_to_base_qty" value="{{ old('subunit_to_base_qty', $product->subunit_to_base_qty ?? null) }}" class="w-full" />
+                <x-input-error :messages="$errors->get('subunit_to_base_qty')" class="mt-1" />
+            </div>
+
+            <div>
+                <x-input-label for="package_weight_kg" value="1 Büyük Paket ağırlığı (kg)" />
+                <x-text-input id="package_weight_kg" type="number" min="0" step="0.001" name="package_weight_kg" value="{{ old('package_weight_kg', $product->package_weight_kg ?? null) }}" class="w-full" />
+                <x-input-error :messages="$errors->get('package_weight_kg')" class="mt-1" />
             </div>
 
             <div class="md:col-span-2">

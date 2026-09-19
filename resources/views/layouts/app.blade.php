@@ -61,10 +61,10 @@
                 </div>
 
                 <div>
-                    <p class="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">Satış</p>
+                    <p class="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">Sipariş</p>
                     <div class="space-y-1">
                         <x-sidebar-link :href="route('sales.index')" :active="request()->routeIs('sales.*')">
-                            Satışlar
+                            Siparişler
                         </x-sidebar-link>
                     </div>
                 </div>
@@ -183,5 +183,29 @@
             </footer>
         </div>
     </div>
+
+    <script data-enter-guard>
+        // Enter must not save a data-entry form by accident (barcode scanners and tablet keyboards
+        // send Enter too). In any POST form with two or more fields it moves to the next field; the
+        // form is saved only through its Kaydet button. Opt out with data-enter-submit on the form.
+        // Pages that handle Enter themselves (e.g. the order form) call preventDefault first and are skipped.
+        document.addEventListener('keydown', function (e) {
+            if (e.defaultPrevented || e.isComposing || (e.key !== 'Enter' && e.keyCode !== 13)) return;
+            var t = e.target;
+            var inert = ['hidden', 'submit', 'button', 'reset', 'image', 'file'];
+            if (!t || t.tagName !== 'INPUT' || inert.indexOf((t.type || '').toLowerCase()) !== -1) return;
+            var form = t.form;
+            if (!form || String(form.getAttribute('method')).toLowerCase() !== 'post' || form.hasAttribute('data-enter-submit')) return;
+            var fields = Array.prototype.filter.call(form.elements, function (el) {
+                if (el.disabled || el.readOnly || el.getClientRects().length === 0) return false;
+                if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') return true;
+                return el.tagName === 'INPUT' && inert.indexOf((el.type || '').toLowerCase()) === -1;
+            });
+            if (fields.length < 2) return;
+            e.preventDefault();
+            var i = fields.indexOf(t);
+            if (i > -1 && i < fields.length - 1) fields[i + 1].focus();
+        });
+    </script>
 </body>
 </html>

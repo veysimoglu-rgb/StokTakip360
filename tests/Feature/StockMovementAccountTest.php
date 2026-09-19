@@ -45,7 +45,7 @@ class StockMovementAccountTest extends TestCase
         ]);
 
         $response->assertRedirect();
-        $this->assertSame(15, $product->fresh()->current_stock);
+        $this->assertSame(15.0, (float) $product->fresh()->current_stock);
         $this->assertDatabaseHas('stock_movements', [
             'product_id' => $product->id,
             'type' => 'in',
@@ -66,7 +66,7 @@ class StockMovementAccountTest extends TestCase
         ]);
 
         $response->assertRedirect();
-        $this->assertSame(6, $product->fresh()->current_stock);
+        $this->assertSame(6.0, (float) $product->fresh()->current_stock);
         $this->assertDatabaseHas('stock_movements', [
             'product_id' => $product->id,
             'type' => 'out',
@@ -105,7 +105,7 @@ class StockMovementAccountTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors('account_id');
-        $this->assertSame(5, $product->fresh()->current_stock);
+        $this->assertSame(5.0, (float) $product->fresh()->current_stock);
         $this->assertSame(0, StockMovement::count());
     }
 
@@ -122,7 +122,7 @@ class StockMovementAccountTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors('account_id');
-        $this->assertSame(10, $product->fresh()->current_stock);
+        $this->assertSame(10.0, (float) $product->fresh()->current_stock);
         $this->assertSame(0, StockMovement::count());
     }
 
@@ -153,7 +153,7 @@ class StockMovementAccountTest extends TestCase
         $this->actingAs($admin)->post('/stock-in', ['product_id' => $product->id, 'quantity' => 5])->assertRedirect();
         $this->actingAs($admin)->post('/stock-out', ['product_id' => $product->id, 'quantity' => 3])->assertRedirect();
 
-        $this->assertSame(12, $product->fresh()->current_stock);
+        $this->assertSame(12.0, (float) $product->fresh()->current_stock);
     }
 
     // 5. movement-value raporunda tek "Cari" dropdown'u tüm cari tiplerini (customer/supplier/other) listelemeli
@@ -203,7 +203,7 @@ class StockMovementAccountTest extends TestCase
         ]);
 
         $response->assertForbidden();
-        $this->assertSame(5, $product->fresh()->current_stock);
+        $this->assertSame(5.0, (float) $product->fresh()->current_stock);
         $this->assertSame(0, StockMovement::count());
     }
 
@@ -222,7 +222,7 @@ class StockMovementAccountTest extends TestCase
         ]);
 
         $response->assertForbidden();
-        $this->assertSame(10, $product->fresh()->current_stock);
+        $this->assertSame(10.0, (float) $product->fresh()->current_stock);
         $this->assertSame(0, StockMovement::count());
     }
 

@@ -69,7 +69,7 @@
                 </svg>
             </span>
             <p class="text-xs sm:text-sm text-gray-500">Bugünkü Stok Girişi / Çıkışı</p>
-            <p class="text-3xl font-semibold text-orange-600 mt-1">{{ $todayIn }} / {{ $todayOut }}</p>
+            <p class="text-3xl font-semibold text-orange-600 mt-1">{{ \App\Support\Quantity::format($todayIn) }} / {{ \App\Support\Quantity::format($todayOut) }}</p>
         </div>
         <div class="bg-white rounded-lg shadow p-3 sm:p-5">
             <span class="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 mb-1.5 sm:mb-2">
@@ -161,7 +161,7 @@
                 <div class="flex items-center justify-between py-1.5 border-b last:border-0 text-sm">
                     <span class="truncate">{{ $product->name }}</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 shrink-0 ms-2">
-                        {{ $product->current_stock }} {{ $product->unit }}
+                        {{ \App\Support\Quantity::format($product->current_stock) }} {{ $product->unit }}
                     </span>
                 </div>
             @empty
@@ -182,7 +182,7 @@
                         'bg-green-100 text-green-700' => $movement->type === 'in',
                         'bg-red-100 text-red-700' => $movement->type === 'out',
                     ])>
-                        {{ $movement->type === 'in' ? '+' : '-' }}{{ $movement->quantity }}
+                        {{ $movement->type === 'in' ? '+' : '-' }}{{ \App\Support\Quantity::format($movement->quantity) }}
                     </span>
                 </div>
             @empty

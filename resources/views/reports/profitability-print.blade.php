@@ -35,7 +35,7 @@
         <div class="totals">
             <div>
                 <div class="label">SATILAN ADET</div>
-                <div class="value">{{ (int) $row->qty }}</div>
+                <div class="value">{{ \App\Support\Quantity::format($row->qty) }}</div>
             </div>
             <div>
                 <div class="label">TOPLAM SATIŞ</div>
@@ -55,7 +55,7 @@
             </div>
         </div>
         @if ((float) $row->revenue_without_cost > 0)
-            <p class="meta">Maliyet bilgisi olmayan satış: {{ (int) $row->qty_without_cost }} adet, {{ \App\Support\Currency::format($row->revenue_without_cost, $currency) }} — kâr hesabına dahil edilmedi.</p>
+            <p class="meta">Maliyet bilgisi olmayan satış: {{ \App\Support\Quantity::format($row->qty_without_cost) }} adet, {{ \App\Support\Currency::format($row->revenue_without_cost, $currency) }} — kâr hesabına dahil edilmedi.</p>
         @endif
 
         <table>
@@ -75,7 +75,7 @@
                     <tr>
                         <td>{{ $productRow->product_name }}</td>
                         <td>{{ $productRow->product_code }}</td>
-                        <td class="text-right">{{ (int) $productRow->qty }}</td>
+                        <td class="text-right">{{ \App\Support\Quantity::format($productRow->qty) }}</td>
                         <td class="text-right">{{ \App\Support\Currency::format($productRow->revenue, $currency) }}</td>
                         <td class="text-right">{{ $productRow->has_cost ? \App\Support\Currency::format($productRow->cost, $currency) : 'Maliyet bilgisi yok' }}</td>
                         <td class="text-right">{{ $productRow->profit === null ? '—' : \App\Support\Currency::format($productRow->profit, $currency) }}</td>

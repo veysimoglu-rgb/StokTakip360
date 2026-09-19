@@ -18,8 +18,8 @@
                         <td class="px-4 py-3 font-mono text-xs">{{ $product->code }}</td>
                         <td class="px-4 py-3">{{ $product->name }}</td>
                         <td class="px-4 py-3">{{ $product->category?->name ?? '-' }}</td>
-                        <td class="px-4 py-3 text-right text-red-600 font-medium">{{ $product->current_stock }} {{ $product->unit }}</td>
-                        <td class="px-4 py-3 text-right">{{ $product->min_stock }} {{ $product->unit }}</td>
+                        <td class="px-4 py-3 text-right text-red-600 font-medium">{{ \App\Support\Quantity::format($product->current_stock) }} {{ $product->unit }}</td>
+                        <td class="px-4 py-3 text-right">{{ \App\Support\Quantity::format($product->min_stock) }} {{ $product->unit }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">Kritik seviyede ürün yok.</td></tr>

@@ -70,7 +70,7 @@
                         @foreach ($purchase->items as $item)
                             <tr>
                                 <td class="px-4 py-3">{{ $item->product->name }}</td>
-                                <td class="px-4 py-3 text-right">{{ $item->quantity }}</td>
+                                <td class="px-4 py-3 text-right">{{ \App\Support\Quantity::format($item->quantity) }}</td>
                                 <td class="px-4 py-3 text-right">{{ \App\Support\Currency::format($item->unit_price, $purchase->currency) }}</td>
                                 <td class="px-4 py-3 text-right">{{ \App\Support\Currency::format($item->line_total, $purchase->currency) }}</td>
                             </tr>

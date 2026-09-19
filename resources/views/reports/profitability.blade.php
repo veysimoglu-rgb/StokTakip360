@@ -69,7 +69,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
             @foreach ($summaryByCurrency as $currency => $row)
                 <x-currency-summary-card :currency="$currency">
-                    <x-metric-stat label="Satılan Adet" :value="(int) $row->qty" />
+                    <x-metric-stat label="Satılan Adet" :value="\App\Support\Quantity::format($row->qty)" />
                     <x-metric-stat label="Toplam Satış Tutarı" :value="\App\Support\Currency::format($row->revenue, $currency)" />
                     <x-metric-stat label="Toplam Maliyet" :value="\App\Support\Currency::format($row->cost, $currency)" color="text-blue-600" />
                     <x-metric-stat
@@ -96,7 +96,7 @@
                 tutarına dahil, ancak maliyet/kâr hesabına dahil edilmedi.
                 @foreach ($summaryByCurrency as $currency => $row)
                     @if ((float) $row->revenue_without_cost > 0)
-                        <span class="block mt-1">{{ $currency }}: {{ (int) $row->qty_without_cost }} adet, {{ \App\Support\Currency::format($row->revenue_without_cost, $currency) }} maliyetsiz satış.</span>
+                        <span class="block mt-1">{{ $currency }}: {{ \App\Support\Quantity::format($row->qty_without_cost) }} adet, {{ \App\Support\Currency::format($row->revenue_without_cost, $currency) }} maliyetsiz satış.</span>
                     @endif
                 @endforeach
             </div>
@@ -128,7 +128,7 @@
                             <td class="px-4 py-3">{{ $row->product_name }}</td>
                             <td class="hidden sm:table-cell px-4 py-3 font-mono text-xs">{{ $row->product_code }}</td>
                             <td class="hidden sm:table-cell px-4 py-3">{{ $currency }}</td>
-                            <td class="px-4 py-3 text-right">{{ (int) $row->qty }}</td>
+                            <td class="px-4 py-3 text-right">{{ \App\Support\Quantity::format($row->qty) }}</td>
                             <td class="px-4 py-3 text-right font-medium">{{ \App\Support\Currency::format($row->revenue, $currency) }}</td>
                             <td class="hidden sm:table-cell px-4 py-3 text-right">
                                 {{ $row->has_cost ? \App\Support\Currency::format($row->cost, $currency) : 'Maliyet bilgisi yok' }}

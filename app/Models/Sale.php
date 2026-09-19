@@ -22,10 +22,11 @@ class Sale extends Model
         'number', 'account_id', 'payment_type', 'subtotal', 'discount_total',
         'total', 'paid_amount', 'currency', 'status', 'note', 'sale_date', 'due_date', 'user_id',
         'debt_account_transaction_id', 'payment_account_transaction_id',
-        'cash_transaction_id', 'cancelled_at',
+        'cash_transaction_id', 'cancelled_at', 'edited_at',
     ];
 
     protected $casts = [
+        'edited_at' => 'datetime',
         'subtotal' => 'decimal:2',
         'discount_total' => 'decimal:2',
         'total' => 'decimal:2',
@@ -86,6 +87,39 @@ class Sale extends Model
     }
 
     /**
+     * The cari's balance (in this order's currency) as it stood right before
+     * this order was placed: every ledger row of the account created before
+     * the order's own first cari row. Cancel/reversal pairs, collections and
+     * other currencies therefore behave exactly as in the account statement
+     * (a pair nets to zero; USD never leaks into a TL order), and neither the
+     * order's own debt/payment legs nor later collections or edits can shift
+     * it. Null when the order has no cari (walk-in cash order).
+     */
+    public function carriedBalance(): ?float
+    {
+        if (! $this->account_id) {
+            return null;
+        }
+
+        $firstOwnId = AccountTransaction::where('source_type', self::class)
+            ->where('source_id', $this->id)
+            ->where('account_id', $this->account_id)
+            ->where('currency', $this->currency)
+            ->min('id');
+
+        return (float) (AccountTransaction::where('account_id', $this->account_id)
+            ->where('currency', $this->currency)
+            ->when($firstOwnId !== null, fn ($q) => $q->where('id', '<', $firstOwnId))
+            ->selectRaw("SUM(CASE WHEN direction = 'debit' THEN amount ELSE -amount END) as balance")
+            ->value('balance') ?? 0);
+    }
+
+    public function totalWeightKg(): float
+    {
+        return (float) $this->items->sum(fn ($item) => (float) $item->line_weight_kg);
+    }
+
+    /**
      * Unpaid (or partially paid), not cancelled, and past its due date.
      * A fully paid or cancelled sale is never overdue, no matter how old
      * its due_date is.
@@ -106,12 +140,16 @@ class Sale extends Model
             && ! $this->isCancelled();
     }
 
+    /**
+     * New orders are numbered SIP-000020. The sequence simply continues after
+     * the existing rows (legacy SAT-… numbers are never touched or renumbered).
+     */
     public static function generateNumber(): string
     {
         $next = static::count() + 1;
 
         do {
-            $number = 'SAT-'.str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+            $number = 'SIP-'.str_pad((string) $next, 6, '0', STR_PAD_LEFT);
             $next++;
         } while (static::where('number', $number)->exists());
 

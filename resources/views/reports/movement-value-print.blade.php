@@ -32,11 +32,11 @@
     <div class="totals">
         <div>
             <div class="label">TOPLAM GİRİŞ MİKTARI</div>
-            <div class="value">{{ $qtyTotals->get('in', 0) }}</div>
+            <div class="value">{{ \App\Support\Quantity::format($qtyTotals->get('in', 0)) }}</div>
         </div>
         <div>
             <div class="label">TOPLAM ÇIKIŞ MİKTARI</div>
-            <div class="value">{{ $qtyTotals->get('out', 0) }}</div>
+            <div class="value">{{ \App\Support\Quantity::format($qtyTotals->get('out', 0)) }}</div>
         </div>
         @foreach ($totalsByCurrency as $currency => $rows)
             @foreach ($rows as $row)
@@ -67,7 +67,7 @@
                     <td>{{ $movement->product->name }}</td>
                     <td>{{ $movement->product->code }}</td>
                     <td>{{ $movement->type === 'in' ? 'Giriş' : 'Çıkış' }}</td>
-                    <td class="text-right">{{ $movement->quantity }}</td>
+                    <td class="text-right">{{ \App\Support\Quantity::format($movement->quantity) }}</td>
                     <td class="text-right">
                         @if ($movement->amount() === null)
                             -

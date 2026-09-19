@@ -11,16 +11,33 @@ class Product extends Model
 
     protected $fillable = [
         'code', 'barcode', 'name', 'category_id', 'brand_id', 'unit',
+        'package_label', 'package_qty', 'subunit_label', 'subunit_to_base_qty', 'package_weight_kg',
         'min_stock', 'current_stock', 'shelf_location',
         'purchase_price', 'sale_price', 'currency', 'vat_rate', 'description', 'active',
     ];
 
     protected $casts = [
         'active' => 'boolean',
+        'current_stock' => 'decimal:3',
+        'min_stock' => 'decimal:3',
+        'package_qty' => 'integer',
+        'subunit_to_base_qty' => 'integer',
+        'package_weight_kg' => 'decimal:3',
         'purchase_price' => 'decimal:2',
         'sale_price' => 'decimal:2',
         'vat_rate' => 'decimal:2',
     ];
+
+    public function hasPackaging(): bool
+    {
+        return $this->package_qty > 0 && $this->subunit_to_base_qty > 0;
+    }
+
+    /** How many base units (adet) one package (balya) contains. */
+    public function baseUnitsPerPackage(): int
+    {
+        return $this->hasPackaging() ? $this->package_qty * $this->subunit_to_base_qty : 0;
+    }
 
     public function category()
     {

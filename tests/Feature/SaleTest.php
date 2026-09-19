@@ -56,7 +56,7 @@ class SaleTest extends TestCase
         $sale = Sale::first();
         $this->assertSame('paid', $sale->status);
         $this->assertSame(150.0, (float) $sale->total);
-        $this->assertSame(17, $product->fresh()->current_stock);
+        $this->assertSame(17.0, (float) $product->fresh()->current_stock);
         $this->assertSame(0, AccountTransaction::count());
         $this->assertSame(150.0, CashTransaction::balance());
         $this->assertSame(Sale::class, StockMovement::first()->source_type);
@@ -142,7 +142,7 @@ class SaleTest extends TestCase
         $this->assertNull($sale->payment_account_transaction_id);
 
         // Stok doğru değişmeli.
-        $this->assertSame(17, $product->fresh()->current_stock);
+        $this->assertSame(17.0, (float) $product->fresh()->current_stock);
     }
 
     /**
@@ -168,7 +168,7 @@ class SaleTest extends TestCase
         $this->assertSame(0, Sale::count());
         $this->assertSame(0, StockMovement::count());
         $this->assertSame(0.0, $customer->fresh()->balance());
-        $this->assertSame(20, $product->fresh()->current_stock);
+        $this->assertSame(20.0, (float) $product->fresh()->current_stock);
     }
 
     /**
@@ -288,13 +288,13 @@ class SaleTest extends TestCase
         $sale = Sale::first();
         $this->assertSame(2, $sale->items()->count());
         $this->assertSame(70.0, (float) $sale->total);
-        $this->assertSame(8, $productA->fresh()->current_stock);
-        $this->assertSame(4, $productB->fresh()->current_stock);
+        $this->assertSame(8.0, (float) $productA->fresh()->current_stock);
+        $this->assertSame(4.0, (float) $productB->fresh()->current_stock);
         $this->assertSame(2, StockMovement::where('source_type', Sale::class)->count());
     }
 
-    // 9. Yetersiz stok -> tüm işlem geri alınır (atomiklik)
-    public function test_insufficient_stock_rolls_back_the_whole_sale(): void
+    // 9. Yetersiz stok, kullanıcı onaylamadıysa -> uyarı, hiçbir kayıt oluşmaz (atomiklik)
+    public function test_insufficient_stock_without_confirmation_creates_nothing(): void
     {
         $product = $this->product(stock: 2, price: 50);
 
@@ -303,11 +303,132 @@ class SaleTest extends TestCase
             'items' => [['product_id' => $product->id, 'quantity' => 5, 'unit_price' => 50]],
         ]);
 
-        $response->assertSessionHas('error');
+        $response->assertSessionHas('stock_warning');
         $this->assertSame(0, Sale::count());
         $this->assertSame(0, StockMovement::count());
         $this->assertSame(0, CashTransaction::count());
-        $this->assertSame(2, $product->fresh()->current_stock);
+        $this->assertSame(2.0, (float) $product->fresh()->current_stock);
+    }
+
+    // Yeni siparişler SIP- ile numaralanır; eski SAT- numaraları değişmez ve ilişkileri bozulmaz
+    public function test_new_orders_are_numbered_with_sip_and_legacy_sat_numbers_are_untouched(): void
+    {
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $legacy = Sale::create([
+            'number' => 'SAT-000019', 'account_id' => $customer->id, 'payment_type' => 'pesin',
+            'subtotal' => 100, 'discount_total' => 0, 'total' => 100, 'paid_amount' => 100,
+            'status' => 'paid', 'sale_date' => now(), 'currency' => 'TL',
+        ]);
+        $product = $this->product(stock: 50, price: 10);
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->post('/sales', ['payment_type' => 'pesin', 'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 10]]]);
+        $this->actingAs($admin)->post('/sales', ['payment_type' => 'pesin', 'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 10]]]);
+
+        $this->assertSame(['SAT-000019', 'SIP-000002', 'SIP-000003'], Sale::orderBy('id')->pluck('number')->all());
+        $this->assertSame('SAT-000019', $legacy->fresh()->number);
+
+        // düzenleme numarayı değiştirmez; iptal edilen sipariş numarası yeniden kullanılmaz
+        $second = Sale::where('number', 'SIP-000002')->first();
+        $this->actingAs($admin)->put("/sales/{$second->id}", ['payment_type' => 'pesin', 'items' => [['product_id' => $product->id, 'quantity' => 2, 'unit_price' => 10]]]);
+        $this->assertSame('SIP-000002', $second->fresh()->number);
+
+        $this->actingAs($admin)->post("/sales/{$second->id}/cancel");
+        $this->actingAs($admin)->post('/sales', ['payment_type' => 'pesin', 'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 10]]]);
+        $this->assertSame('SIP-000004', Sale::orderByDesc('id')->first()->number);
+    }
+
+    public function test_the_sip_number_is_shown_on_the_receipt_and_detail_page(): void
+    {
+        $product = $this->product(stock: 5, price: 10);
+        $admin = $this->admin();
+        $this->actingAs($admin)->post('/sales', ['payment_type' => 'pesin', 'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 10]]]);
+        $sale = Sale::first();
+
+        $this->assertSame('SIP-000001', $sale->number);
+        $this->actingAs($admin)->get(route('sales.receipt', $sale))->assertSee('SIP-000001');
+        $this->actingAs($admin)->get(route('sales.show', $sale))->assertSee('SIP-000001');
+    }
+
+    // Yetersiz stok + açık onay: sipariş tam tutarıyla kaydedilir ama stok ASLA negatife düşmez.
+    public function test_confirmed_shortage_saves_full_order_but_stock_never_goes_negative(): void
+    {
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product(stock: 2, price: 50);
+
+        $response = $this->actingAs($this->admin())->post('/sales', [
+            'account_id' => $customer->id,
+            'payment_type' => 'vadeli',
+            'due_date' => now()->addDays(30)->toDateString(),
+            'confirm_insufficient_stock' => 1,
+            'items' => [['product_id' => $product->id, 'quantity' => 5, 'unit_price' => 50]],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $sale = Sale::first();
+        $this->assertNotNull($sale);
+        $this->assertSame(250.0, (float) $sale->total);
+        $this->assertSame(250.0, $customer->fresh()->balance());
+
+        $item = $sale->items()->first();
+        $this->assertSame(5.0, (float) $item->quantity);
+        $this->assertSame(3.0, (float) $item->stock_shortfall_quantity);
+
+        $movement = StockMovement::where('source_type', Sale::class)->first();
+        $this->assertSame(2.0, (float) $movement->quantity);
+        $this->assertSame(0.0, (float) $product->fresh()->current_stock);
+    }
+
+    public function test_confirmed_order_on_zero_stock_creates_no_stock_movement_and_stays_at_zero(): void
+    {
+        $product = $this->product(stock: 0, price: 50);
+
+        $this->actingAs($this->admin())->post('/sales', [
+            'payment_type' => 'pesin',
+            'confirm_insufficient_stock' => 1,
+            'items' => [['product_id' => $product->id, 'quantity' => 4, 'unit_price' => 50]],
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame(1, Sale::count());
+        $this->assertSame(0, StockMovement::count());
+        $this->assertSame(0.0, (float) $product->fresh()->current_stock);
+        $this->assertSame(200.0, CashTransaction::balance());
+    }
+
+    public function test_same_product_on_two_lines_shares_the_available_stock(): void
+    {
+        $product = $this->product(stock: 5, price: 10);
+
+        $this->actingAs($this->admin())->post('/sales', [
+            'payment_type' => 'pesin',
+            'confirm_insufficient_stock' => 1,
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => 3, 'unit_price' => 10],
+                ['product_id' => $product->id, 'quantity' => 4, 'unit_price' => 10],
+            ],
+        ])->assertSessionHasNoErrors();
+
+        $items = Sale::first()->items()->orderBy('id')->get();
+        $this->assertSame(0.0, (float) $items[0]->stock_shortfall_quantity);
+        $this->assertSame(2.0, (float) $items[1]->stock_shortfall_quantity);
+        $this->assertSame(0.0, (float) $product->fresh()->current_stock);
+    }
+
+    public function test_cancelling_an_order_with_a_shortfall_restores_only_what_was_taken(): void
+    {
+        $product = $this->product(stock: 2, price: 50);
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->post('/sales', [
+            'payment_type' => 'pesin',
+            'confirm_insufficient_stock' => 1,
+            'items' => [['product_id' => $product->id, 'quantity' => 5, 'unit_price' => 50]],
+        ]);
+
+        $sale = Sale::first();
+        $this->actingAs($admin)->post("/sales/{$sale->id}/cancel")->assertRedirect();
+
+        $this->assertSame(2.0, (float) $product->fresh()->current_stock);
     }
 
     // İskonto ara toplamdan büyükse reddedilir
@@ -342,8 +463,8 @@ class SaleTest extends TestCase
             'items' => [['product_id' => $product->id, 'quantity' => 2, 'unit_price' => 50]],
         ]);
 
-        $second->assertSessionHas('error');
-        $this->assertSame(1, $product->fresh()->current_stock);
+        $second->assertSessionHas('stock_warning');
+        $this->assertSame(1.0, (float) $product->fresh()->current_stock);
         $this->assertSame(1, Sale::count());
     }
 
@@ -369,7 +490,7 @@ class SaleTest extends TestCase
         $this->assertTrue($sale->fresh()->isCancelled());
         $this->assertSame(0.0, $customer->fresh()->balance());
         $this->assertSame(0.0, CashTransaction::balance());
-        $this->assertSame(50, $product->fresh()->current_stock);
+        $this->assertSame(50.0, (float) $product->fresh()->current_stock);
     }
 
     // 13. Çift iptal engeli
@@ -409,7 +530,7 @@ class SaleTest extends TestCase
         $response->assertRedirect();
         $this->assertTrue($sale->fresh()->isCancelled());
         $this->assertSame(0.0, $customer->fresh()->balance());
-        $this->assertSame(20, $product->fresh()->current_stock);
+        $this->assertSame(20.0, (float) $product->fresh()->current_stock);
     }
 
     // 15. cash_transactions üzerinden iptal edilirse tüm satış zinciri terslenir
@@ -429,7 +550,7 @@ class SaleTest extends TestCase
 
         $response->assertRedirect();
         $this->assertTrue($sale->fresh()->isCancelled());
-        $this->assertSame(20, $product->fresh()->current_stock);
+        $this->assertSame(20.0, (float) $product->fresh()->current_stock);
         $this->assertSame(0.0, CashTransaction::balance());
     }
 
@@ -452,7 +573,7 @@ class SaleTest extends TestCase
 
         $response->assertForbidden();
         $this->assertFalse($sale->fresh()->isCancelled());
-        $this->assertSame(17, $product->fresh()->current_stock);
+        $this->assertSame(17.0, (float) $product->fresh()->current_stock);
         $this->assertSame(150.0, CashTransaction::balance());
     }
 

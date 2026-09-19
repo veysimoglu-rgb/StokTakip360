@@ -202,7 +202,7 @@ class SaleCostSnapshotTest extends TestCase
         $this->actingAs($this->admin())->post('/sales', [
             'payment_type' => 'pesin',
             'items' => [['product_id' => $product->id, 'quantity' => 10, 'unit_price' => 50]],
-        ])->assertSessionHas('error');
+        ])->assertSessionHas('stock_warning');
 
         $this->assertSame(0, Sale::count());
         $this->assertSame(0, SaleItem::count());
@@ -226,7 +226,7 @@ class SaleCostSnapshotTest extends TestCase
         $sale = Sale::first();
         $this->assertSame(1000.0, (float) $sale->total);
         $this->assertSame('partial', $sale->status);
-        $this->assertSame(40, $product->fresh()->current_stock);
+        $this->assertSame(40.0, (float) $product->fresh()->current_stock);
         $this->assertSame(600.0, $customer->fresh()->balanceForCurrency('TL'));
         $this->assertSame(400.0, CashTransaction::balanceForCurrency('TL'));
     }

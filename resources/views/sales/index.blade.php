@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="title">Satışlar</x-slot>
+    <x-slot name="title">Siparişler</x-slot>
 
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <form method="GET" class="flex flex-wrap gap-2">
@@ -13,11 +13,11 @@
         </form>
         @role('Admin')
         <a href="{{ route('sales.create') }}" class="hidden sm:inline-block">
-            <x-primary-button>+ Yeni Satış</x-primary-button>
+            <x-primary-button>+ Yeni Sipariş</x-primary-button>
         </a>
         <a href="{{ route('sales.create') }}"
            class="sm:hidden fixed top-20 right-4 z-30 w-12 h-12 rounded-full bg-indigo-600 text-white shadow-lg flex items-center justify-center text-2xl leading-none"
-           aria-label="Yeni Satış">
+           aria-label="Yeni Sipariş">
             +
         </a>
         @endrole
@@ -32,6 +32,9 @@
                     <th class="hidden sm:table-cell px-4 py-3">Müşteri</th>
                     <th class="px-4 py-3 text-right">Tutar</th>
                     <th class="px-4 py-3">Durum</th>
+                    @role('Admin')
+                        <th class="px-4 py-3"></th>
+                    @endrole
                 </tr>
             </thead>
             <tbody class="divide-y">
@@ -56,9 +59,16 @@
                                 ])>{{ $sale->statusLabel() }}</span>
                             @endif
                         </td>
+                        @role('Admin')
+                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                @if (! $sale->isCancelled())
+                                    <a href="{{ route('sales.edit', $sale) }}" onclick="event.stopPropagation()" class="text-indigo-600 hover:underline text-xs">Düzenle</a>
+                                @endif
+                            </td>
+                        @endrole
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">Henüz satış yok.</td></tr>
+                    <tr><td colspan="6" class="px-4 py-6 text-center text-gray-500">Henüz sipariş yok.</td></tr>
                 @endforelse
             </tbody>
         </table>

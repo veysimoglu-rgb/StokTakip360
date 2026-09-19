@@ -93,6 +93,8 @@ Route::middleware(['auth', 'license'])->group(function () {
         Route::post('/cash-transactions/{cashTransaction}/cancel', [CashTransactionController::class, 'cancel'])->name('cash-transactions.cancel');
 
         Route::post('/sales', [SaleController::class, 'store'])->name('sales.store');
+        Route::get('/sales/{sale}/edit', [SaleController::class, 'edit'])->name('sales.edit');
+        Route::put('/sales/{sale}', [SaleController::class, 'update'])->name('sales.update');
         Route::post('/sales/{sale}/cancel', [SaleController::class, 'cancel'])->name('sales.cancel');
 
         Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');

@@ -73,11 +73,11 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="bg-white rounded-lg shadow p-5">
             <p class="text-sm text-gray-500">Toplam Giriş Miktarı</p>
-            <p class="text-2xl font-semibold text-gray-800 mt-1">{{ $qtyTotals->get('in', 0) }}</p>
+            <p class="text-2xl font-semibold text-gray-800 mt-1">{{ \App\Support\Quantity::format($qtyTotals->get('in', 0)) }}</p>
         </div>
         <div class="bg-white rounded-lg shadow p-5">
             <p class="text-sm text-gray-500">Toplam Çıkış Miktarı</p>
-            <p class="text-2xl font-semibold text-gray-800 mt-1">{{ $qtyTotals->get('out', 0) }}</p>
+            <p class="text-2xl font-semibold text-gray-800 mt-1">{{ \App\Support\Quantity::format($qtyTotals->get('out', 0)) }}</p>
         </div>
         @foreach ($totalsByCurrency as $currency => $rows)
             @foreach ($rows as $row)
@@ -110,7 +110,7 @@
                         <td class="px-4 py-3">{{ $row->name }}</td>
                         <td class="px-4 py-3 font-mono text-xs">{{ $row->code }}</td>
                         <td class="px-4 py-3">{{ $categoryNames->get($row->category_id, '-') }}</td>
-                        <td class="px-4 py-3 text-right">{{ $row->qty_out }}</td>
+                        <td class="px-4 py-3 text-right">{{ \App\Support\Quantity::format($row->qty_out) }}</td>
                         <td class="px-4 py-3">{{ $row->currency ?? 'Bilinmiyor' }}</td>
                         <td class="px-4 py-3 text-right">
                             @if ($row->amount > 0 && $row->currency)
@@ -151,7 +151,7 @@
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-800">Çıkış</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-right">{{ $movement->quantity }}</td>
+                        <td class="px-4 py-3 text-right">{{ \App\Support\Quantity::format($movement->quantity) }}</td>
                         <td class="px-4 py-3 text-right">
                             @if ($movement->amount() === null)
                                 -

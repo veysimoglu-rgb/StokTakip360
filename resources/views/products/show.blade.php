@@ -36,11 +36,14 @@
             <p class="text-xs sm:text-sm text-gray-500">Kategori / Marka</p>
             <p class="text-base sm:text-lg font-semibold text-gray-800 mt-1">{{ $product->category?->name ?? '-' }}</p>
             <p class="text-xs text-gray-400">{{ $product->brand?->name ?? '-' }} · {{ $product->unit }}</p>
+            @if ($product->hasPackaging())
+                <p class="text-xs text-gray-400 mt-1">1 {{ $product->package_label ?: 'Paket' }} = {{ $product->package_qty }} {{ $product->subunit_label ?: 'Paket' }} = {{ \App\Support\Quantity::format($product->baseUnitsPerPackage()) }} {{ $product->unit }}{{ $product->package_weight_kg !== null ? ' · '.\App\Support\Quantity::format($product->package_weight_kg).' kg' : '' }}</p>
+            @endif
         </div>
         <div class="bg-white rounded-lg shadow p-3 sm:p-5">
             <p class="text-xs sm:text-sm text-gray-500">Mevcut Stok</p>
-            <p class="text-3xl font-semibold text-gray-800 mt-1">{{ $product->current_stock }}</p>
-            <p class="text-xs text-gray-400">Kritik seviye: {{ $product->min_stock }}{{ $product->shelf_location ? ' · '.$product->shelf_location : '' }}</p>
+            <p class="text-3xl font-semibold text-gray-800 mt-1">{{ \App\Support\Quantity::format($product->current_stock) }}</p>
+            <p class="text-xs text-gray-400">Kritik seviye: {{ \App\Support\Quantity::format($product->min_stock) }}{{ $product->shelf_location ? ' · '.$product->shelf_location : '' }}</p>
         </div>
         <div class="bg-white rounded-lg shadow p-3 sm:p-5">
             <p class="text-xs sm:text-sm text-gray-500">Güncel Satış Fiyatı</p>
@@ -63,7 +66,7 @@
                 <div class="space-y-2">
                     @foreach ($saleSummaryByCurrency as $currency => $row)
                         <x-currency-summary-card :currency="$currency">
-                            <x-metric-stat label="Toplam Satılan Adet" :value="(int) $row->qty" />
+                            <x-metric-stat label="Toplam Satılan Adet" :value="\App\Support\Quantity::format($row->qty)" />
                             <x-metric-stat label="Toplam Satış Tutarı" :value="\App\Support\Currency::format($row->total, $currency)" color="text-green-600" />
                             <x-metric-stat label="Ortalama Satış Fiyatı" :value="\App\Support\Currency::format($row->avg_price, $currency)" />
                             <x-metric-stat label="Son Satış" :value="\Illuminate\Support\Carbon::parse($row->last_date)->format('d.m.Y')" />
@@ -81,7 +84,7 @@
                 <div class="space-y-2">
                     @foreach ($purchaseSummaryByCurrency as $currency => $row)
                         <x-currency-summary-card :currency="$currency">
-                            <x-metric-stat label="Toplam Alınan Adet" :value="(int) $row->qty" />
+                            <x-metric-stat label="Toplam Alınan Adet" :value="\App\Support\Quantity::format($row->qty)" />
                             <x-metric-stat label="Toplam Alış Tutarı" :value="\App\Support\Currency::format($row->total, $currency)" color="text-blue-600" />
                             <x-metric-stat label="Ortalama Alış Fiyatı" :value="\App\Support\Currency::format($row->avg_price, $currency)" />
                             <x-metric-stat label="Son Alış" :value="\Illuminate\Support\Carbon::parse($row->last_date)->format('d.m.Y')" />
@@ -95,13 +98,13 @@
     {{-- ============================= SATIŞ GEÇMİŞİ ============================= --}}
     <div class="bg-white rounded-lg shadow overflow-x-auto mb-2">
         <div class="px-4 pt-4">
-            <h3 class="font-semibold text-gray-800">Satış Geçmişi</h3>
+            <h3 class="font-semibold text-gray-800">Sipariş Geçmişi</h3>
         </div>
         <table class="min-w-full text-sm mt-2">
             <thead class="bg-gray-50 text-gray-600 text-left">
                 <tr>
                     <th class="px-4 py-3">Tarih</th>
-                    <th class="px-4 py-3">Satış No</th>
+                    <th class="px-4 py-3">Sipariş No</th>
                     <th class="hidden sm:table-cell px-4 py-3">Cari</th>
                     <th class="px-4 py-3 text-right">Miktar</th>
                     <th class="hidden sm:table-cell px-4 py-3 text-right">Birim Fiyat</th>
@@ -122,7 +125,7 @@
                             <p class="sm:hidden text-xs text-gray-400 mt-0.5">{{ $item->sale->account?->name ?? 'Genel Müşteri' }}</p>
                         </td>
                         <td class="hidden sm:table-cell px-4 py-3">{{ $item->sale->account?->name ?? 'Genel Müşteri' }}</td>
-                        <td class="px-4 py-3 text-right">{{ $item->quantity }}</td>
+                        <td class="px-4 py-3 text-right">{{ \App\Support\Quantity::format($item->quantity) }}</td>
                         <td class="hidden sm:table-cell px-4 py-3 text-right">{{ \App\Support\Currency::format($item->unit_price, $item->sale->currency) }}</td>
                         <td class="hidden sm:table-cell px-4 py-3 text-right">
                             {{ $item->cost_price !== null ? \App\Support\Currency::format($item->cost_price, $item->sale->currency) : 'Maliyet bilgisi yok' }}
@@ -173,7 +176,7 @@
                             <p class="sm:hidden text-xs text-gray-400 mt-0.5">{{ $item->purchase->account?->name ?? 'Genel Tedarikçi' }}</p>
                         </td>
                         <td class="hidden sm:table-cell px-4 py-3">{{ $item->purchase->account?->name ?? 'Genel Tedarikçi' }}</td>
-                        <td class="px-4 py-3 text-right">{{ $item->quantity }}</td>
+                        <td class="px-4 py-3 text-right">{{ \App\Support\Quantity::format($item->quantity) }}</td>
                         <td class="hidden sm:table-cell px-4 py-3 text-right">{{ \App\Support\Currency::format($item->unit_price, $item->purchase->currency) }}</td>
                         <td class="px-4 py-3 text-right font-medium">{{ \App\Support\Currency::format($item->line_total, $item->purchase->currency) }}</td>
                     </tr>
@@ -216,7 +219,7 @@
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600 ms-1">İptal</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-right">{{ $movement->quantity }}</td>
+                        <td class="px-4 py-3 text-right">{{ \App\Support\Quantity::format($movement->quantity) }}</td>
                         <td class="hidden sm:table-cell px-4 py-3 text-right">
                             @if ($movement->amount() === null)
                                 -

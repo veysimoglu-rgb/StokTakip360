@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="title">Satış {{ $sale->number }}</x-slot>
+    <x-slot name="title">Sipariş {{ $sale->number }}</x-slot>
 
     <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
@@ -17,6 +17,9 @@
                 @endif
                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">{{ $sale->paymentTypeLabel() }}</span>
                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700">{{ $sale->currency }}</span>
+                @if ($sale->edited_at)
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800" title="{{ $sale->edited_at->format('d.m.Y H:i') }}">Düzenlendi</span>
+                @endif
                 @if ($sale->isOverdue())
                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-800">Vadesi Geçti</span>
                 @endif
@@ -29,13 +32,14 @@
             </p>
         </div>
         <div class="flex gap-2">
-            <a href="{{ route('sales.index') }}" class="text-sm text-gray-600 self-center hover:underline">← Satışlar</a>
+            <a href="{{ route('sales.index') }}" class="text-sm text-gray-600 self-center hover:underline">← Siparişler</a>
             <a href="{{ route('sales.receipt', $sale) }}" target="_blank" class="text-sm text-indigo-600 border border-indigo-200 rounded-md px-3 py-1.5 hover:bg-indigo-50 self-center">Fiş Yazdır</a>
             @role('Admin')
             @if (! $sale->isCancelled())
-                <form action="{{ route('sales.cancel', $sale) }}" method="POST" onsubmit="return confirm('Bu satış iptal edilsin mi? Stok, cari ve kasa hareketleri terslenecek.')">
+                <a href="{{ route('sales.edit', $sale) }}" class="text-sm text-indigo-600 border border-indigo-200 rounded-md px-3 py-1.5 hover:bg-indigo-50 self-center">Düzenle</a>
+                <form action="{{ route('sales.cancel', $sale) }}" method="POST" onsubmit="return confirm('Bu sipariş iptal edilsin mi? Stok, cari ve kasa hareketleri terslenecek.')">
                     @csrf
-                    <button type="submit" class="text-sm text-red-600 border border-red-200 rounded-md px-3 py-1.5 hover:bg-red-50">Satışı İptal Et</button>
+                    <button type="submit" class="text-sm text-red-600 border border-red-200 rounded-md px-3 py-1.5 hover:bg-red-50">Siparişi İptal Et</button>
                 </form>
             @endif
             @endrole
@@ -71,7 +75,18 @@
                         @foreach ($sale->items as $item)
                             <tr>
                                 <td class="px-4 py-3">{{ $item->product->name }}</td>
-                                <td class="px-4 py-3 text-right">{{ $item->quantity }}</td>
+                                <td class="px-4 py-3 text-right">
+                                    @if ($item->package_qty_input !== null)
+                                        <span class="block text-xs text-gray-500">{{ \App\Support\Quantity::format($item->package_qty_input) }} {{ $item->product->package_label ?: 'Paket' }}</span>
+                                    @endif
+                                    {{ \App\Support\Quantity::format($item->quantity) }}
+                                    @if ($item->line_weight_kg !== null)
+                                        <span class="block text-xs text-gray-500">{{ \App\Support\Quantity::format($item->line_weight_kg) }} kg</span>
+                                    @endif
+                                    @if ((float) $item->stock_shortfall_quantity > 0)
+                                        <span class="block text-xs text-red-600">{{ \App\Support\Quantity::format($item->stock_shortfall_quantity) }} stokta karşılanamadı</span>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-3 text-right">{{ \App\Support\Currency::format($item->unit_price, $sale->currency) }}</td>
                                 <td class="px-4 py-3 text-right">{{ \App\Support\Currency::format($item->line_total, $sale->currency) }}</td>
                             </tr>
@@ -83,7 +98,7 @@
             <div class="bg-white rounded-lg shadow p-5 text-sm space-y-1 max-w-sm ms-auto">
                 <div class="flex justify-between"><span class="text-gray-500">Ara Toplam</span><span>{{ \App\Support\Currency::format($sale->subtotal, $sale->currency) }}</span></div>
                 <div class="flex justify-between"><span class="text-gray-500">İskonto</span><span>{{ \App\Support\Currency::format($sale->discount_total, $sale->currency) }}</span></div>
-                <div class="flex justify-between text-base font-semibold pt-1 border-t"><span>Genel Toplam</span><span>{{ \App\Support\Currency::format($sale->total, $sale->currency) }}</span></div>
+                <div class="flex justify-between text-base font-semibold pt-1 border-t"><span>Sipariş Toplamı</span><span>{{ \App\Support\Currency::format($sale->total, $sale->currency) }}</span></div>
                 <div class="flex justify-between text-green-600"><span>Ödenen</span><span>{{ \App\Support\Currency::format($sale->paid_amount, $sale->currency) }}</span></div>
                 @if ($sale->remaining() > 0)
                     <div class="flex justify-between text-red-600"><span>Kalan</span><span>{{ \App\Support\Currency::format($sale->remaining(), $sale->currency) }}</span></div>

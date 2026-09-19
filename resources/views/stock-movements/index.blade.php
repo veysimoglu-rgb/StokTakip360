@@ -49,7 +49,7 @@
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-800">Çıkış</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-right">{{ $movement->quantity }}</td>
+                        <td class="px-4 py-3 text-right">{{ \App\Support\Quantity::format($movement->quantity) }}</td>
                         <td class="px-4 py-3">{{ $movement->account?->name ?? '-' }}</td>
                         <td class="px-4 py-3">{{ $movement->user?->name ?? '-' }}</td>
                         <td class="px-4 py-3 text-gray-500">{{ $movement->note ?? '-' }}</td>
