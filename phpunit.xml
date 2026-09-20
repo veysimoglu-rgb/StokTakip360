@@ -40,6 +40,10 @@
         <server name="MMC_SECRET" value="" force="true"/>
         <server name="MMC_LICENSE_KEY" value="" force="true"/>
         <server name="MMC_API_KEY" value="" force="true"/>
+        <!-- The header rate widget must never call the real TCMB service from tests: the feature is
+             switched off here, and its own tests turn it on together with Http::fake(). -->
+        <env name="TCMB_RATES_ENABLED" value="false" force="true"/>
+        <server name="TCMB_RATES_ENABLED" value="false" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>

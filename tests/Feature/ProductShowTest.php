@@ -311,13 +311,17 @@ class ProductShowTest extends TestCase
         $usdResponse = $this->actingAs($admin)->get(route('products.show', $usdProduct));
         $eurResponse = $this->actingAs($admin)->get(route('products.show', $eurProduct));
 
+        // The page CONTENT must not mix currencies. The global header carries the TCMB USD/EUR
+        // indicator on every page, so only <main> is inspected, not the whole document.
+        $main = fn ($response) => preg_match('#<main.*?</main>#s', $response->getContent(), $m) ? $m[0] : '';
+
         $usdResponse->assertOk();
         $usdResponse->assertSee('100,00 USD');
-        $usdResponse->assertDontSee('EUR');
+        $this->assertStringNotContainsString('EUR', $main($usdResponse));
 
         $eurResponse->assertOk();
         $eurResponse->assertSee('50,00 EUR');
-        $eurResponse->assertDontSee('USD');
+        $this->assertStringNotContainsString('USD', $main($eurResponse));
     }
 
     /**

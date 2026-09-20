@@ -55,4 +55,22 @@ return [
         'timeout' => (int) env('MMC_TIMEOUT', 5),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | TCMB daily exchange rates (header USD / EUR indicator)
+    |--------------------------------------------------------------------------
+    |
+    | Official Central Bank of Türkiye bulletin. Fetched server-side by
+    | App\Services\ExchangeRateService at most twice a day (~09:00 and ~16:30
+    | Türkiye time) and cached for every user. Set TCMB_RATES_ENABLED=false to
+    | switch the whole feature off (the header then shows "—"); the test suite
+    | does this so it never contacts the real service.
+    |
+    */
+    'tcmb' => [
+        'enabled' => (bool) env('TCMB_RATES_ENABLED', true),
+        'url' => env('TCMB_RATES_URL', 'https://www.tcmb.gov.tr/kurlar/today.xml'),
+        'timeout' => (int) env('TCMB_RATES_TIMEOUT', 3),
+    ],
+
 ];
