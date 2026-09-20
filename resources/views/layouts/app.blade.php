@@ -36,12 +36,7 @@
             class="fixed inset-y-0 left-0 z-40 w-64 bg-gray-900 text-gray-100 flex flex-col transform transition-transform -translate-x-full lg:static lg:translate-x-0"
             :class="sidebarOpen && '!translate-x-0'"
         >
-            <div class="min-h-16 flex flex-col justify-center px-5 py-2 border-b border-gray-800">
-                <a href="{{ route('dashboard') }}" class="text-lg font-bold text-white leading-tight">StokTakip360</a>
-                @if ($companyName = \App\Models\Setting::get('company_name'))
-                    <span class="text-xs text-gray-400 leading-tight truncate">{{ $companyName }}</span>
-                @endif
-            </div>
+            <x-sidebar-brand />
 
             <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-6 text-sm">
                 <div class="space-y-1">

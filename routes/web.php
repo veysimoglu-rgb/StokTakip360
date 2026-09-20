@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AccountTransactionController;
 use App\Http\Controllers\BrandController;
+use App\Http\Controllers\BrandingController;
 use App\Http\Controllers\CashLedgerController;
 use App\Http\Controllers\CashTransactionController;
 use App\Http\Controllers\CategoryController;
@@ -23,6 +24,8 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'license'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('/branding/logo', [BrandingController::class, 'logo'])->name('branding.logo');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

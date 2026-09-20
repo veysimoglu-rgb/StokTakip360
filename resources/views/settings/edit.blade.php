@@ -2,11 +2,27 @@
     <x-slot name="title">Ayarlar</x-slot>
 
     <div class="bg-white rounded-lg shadow p-6 max-w-lg">
-        <form method="POST" action="{{ route('settings.update') }}" class="space-y-4">
+        <form method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" class="space-y-4">
             @csrf @method('PUT')
             <div>
                 <x-input-label for="company_name" value="Firma Adı" />
                 <x-text-input id="company_name" name="company_name" value="{{ old('company_name', $settings['company_name']) }}" class="w-full" />
+            </div>
+            <div>
+                <x-input-label for="company_logo" value="Firma Logosu" />
+                @if ($logoUrl)
+                    <div class="mt-2 mb-3 rounded-md bg-gray-900 p-3 inline-block max-w-full" data-logo-preview>
+                        <img src="{{ $logoUrl }}" alt="Mevcut logo" style="display:block;max-width:220px;max-height:56px;width:auto;height:auto;object-fit:contain">
+                    </div>
+                @endif
+                <input id="company_logo" type="file" name="company_logo" accept="image/png,image/jpeg,image/webp" class="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200" />
+                <p class="mt-1 text-xs text-gray-500">Sol menünün üstünde gösterilir. PNG, JPG veya WebP, en fazla 2 MB. Şeffaf PNG/WebP önerilir; önerilen oran yaklaşık 600×180 px (3,3:1) ama zorunlu değildir — logo kırpılmadan, oranı korunarak sığdırılır.</p>
+                <x-input-error :messages="$errors->get('company_logo')" class="mt-1" />
+                @if ($logoUrl)
+                    <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                        <input type="checkbox" name="remove_company_logo" value="1" class="rounded border-gray-300"> Mevcut logoyu kaldır
+                    </label>
+                @endif
             </div>
             <div>
                 <x-input-label for="company_phone" value="Telefon" />

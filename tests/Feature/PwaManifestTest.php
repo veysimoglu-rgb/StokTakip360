@@ -184,7 +184,13 @@ class PwaManifestTest extends TestCase
     {
         $this->assertFileExists(public_path('favicon.ico'));
 
+        // The sidebar title moved into the sidebar-brand component when the logo area was added; the
+        // app name and its link to the dashboard are still there.
         $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
-        $this->assertStringContainsString('<a href="{{ route(\'dashboard\') }}" class="text-lg font-bold text-white leading-tight">StokTakip360</a>', $layout);
+        $this->assertStringContainsString('<x-sidebar-brand />', $layout);
+
+        $brand = file_get_contents(resource_path('views/components/sidebar-brand.blade.php'));
+        $this->assertStringContainsString('<a href="{{ route(\'dashboard\') }}" class="sb-home">', $brand);
+        $this->assertStringContainsString('<span class="sb-app">StokTakip360</span>', $brand);
     }
 }
