@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\StaleDocumentException;
 use App\Models\Account;
 use App\Models\Product;
 use App\Models\Purchase;
@@ -38,20 +39,8 @@ class PurchaseController extends Controller
     {
         $data = $this->validated($request);
 
-        if (in_array($data['payment_type'], ['vadeli', 'kismi']) && empty($data['account_id'])) {
-            return back()->withErrors(['account_id' => 'Vadeli veya kısmi ödemeli alışlarda cari seçimi zorunludur.'])->withInput();
-        }
-
-        if (in_array($data['payment_type'], ['vadeli', 'kismi']) && empty($data['due_date'])) {
-            return back()->withErrors(['due_date' => 'Vadeli veya kısmi ödemeli alışlarda vade tarihi zorunludur.'])->withInput();
-        }
-
-        if (! empty($data['account_id'])) {
-            $account = Account::findOrFail($data['account_id']);
-
-            if (! in_array($account->type, ['supplier', 'other'])) {
-                return back()->withErrors(['account_id' => 'Alış için tedarikçi veya diğer tipinde bir cari seçilmelidir.'])->withInput();
-            }
+        if ($error = $this->businessRuleError($data)) {
+            return back()->withErrors($error)->withInput();
         }
 
         try {
@@ -70,6 +59,49 @@ class PurchaseController extends Controller
         return view('purchases.show', compact('purchase'));
     }
 
+    public function edit(Purchase $purchase)
+    {
+        if ($purchase->isCancelled()) {
+            return redirect()->route('purchases.show', $purchase)->with('error', 'İptal edilmiş bir alış düzenlenemez.');
+        }
+
+        $purchase->load(['items.product', 'paymentAccountTransaction', 'cashTransaction']);
+
+        // Only the purchase's own initial payment is editable; payments made
+        // later through the cari screen are preserved by PurchaseService::update().
+        $initialPaidAmount = (float) ($purchase->paymentAccountTransaction?->amount ?? $purchase->cashTransaction?->amount ?? 0);
+
+        // An edited purchase's own products/supplier stay selectable even if deactivated.
+        $products = Product::where(fn ($q) => $q->where('active', true)->orWhereIn('id', $purchase->items->pluck('product_id')))
+            ->orderBy('name')->get();
+        $accounts = Account::where(fn ($q) => $q->where('active', true)->orWhere('id', $purchase->account_id))
+            ->whereIn('type', ['supplier', 'other'])->orderBy('name')->get();
+        $minimumQuantities = $this->purchaseService->minimumQuantities($purchase);
+        $version = $purchase->versionToken();
+
+        return view('purchases.edit', compact('purchase', 'products', 'accounts', 'initialPaidAmount', 'minimumQuantities', 'version'));
+    }
+
+    public function update(Request $request, Purchase $purchase)
+    {
+        $data = $this->validated($request, forUpdate: true);
+
+        if ($error = $this->businessRuleError($data)) {
+            return back()->withErrors($error)->withInput();
+        }
+
+        try {
+            $this->purchaseService->update($purchase, $data, $request->user(), $data['_version']);
+        } catch (StaleDocumentException $e) {
+            // Nothing was saved: reload the current state instead of keeping stale input.
+            return redirect()->route('purchases.edit', $purchase)->with('error', $e->getMessage());
+        } catch (RuntimeException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('purchases.show', $purchase)->with('success', 'Alış güncellendi.');
+    }
+
     public function cancel(Request $request, Purchase $purchase)
     {
         try {
@@ -81,7 +113,31 @@ class PurchaseController extends Controller
         return redirect()->route('purchases.show', $purchase)->with('success', 'Alış iptal edildi.');
     }
 
-    private function validated(Request $request): array
+    /**
+     * @return array<string, string>|null field => message, or null when fine
+     */
+    private function businessRuleError(array $data): ?array
+    {
+        if (in_array($data['payment_type'], ['vadeli', 'kismi']) && empty($data['account_id'])) {
+            return ['account_id' => 'Vadeli veya kısmi ödemeli alışlarda cari seçimi zorunludur.'];
+        }
+
+        if (in_array($data['payment_type'], ['vadeli', 'kismi']) && empty($data['due_date'])) {
+            return ['due_date' => 'Vadeli veya kısmi ödemeli alışlarda vade tarihi zorunludur.'];
+        }
+
+        if (! empty($data['account_id'])) {
+            $account = Account::findOrFail($data['account_id']);
+
+            if (! in_array($account->type, ['supplier', 'other'])) {
+                return ['account_id' => 'Alış için tedarikçi veya diğer tipinde bir cari seçilmelidir.'];
+            }
+        }
+
+        return null;
+    }
+
+    private function validated(Request $request, bool $forUpdate = false): array
     {
         return $request->validate([
             'account_id' => ['nullable', 'exists:accounts,id'],
@@ -96,6 +152,8 @@ class PurchaseController extends Controller
             // No after:today constraint — backdated due dates are allowed
             // (entering a historical vadeli purchase with a past due date).
             'due_date' => ['nullable', 'date'],
+            // Version the edit form was opened with (Purchase::versionToken()).
+            '_version' => $forUpdate ? ['required', 'string'] : ['nullable'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],

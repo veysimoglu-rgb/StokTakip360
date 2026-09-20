@@ -17,6 +17,9 @@
                 @endif
                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">{{ $purchase->paymentTypeLabel() }}</span>
                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700">{{ $purchase->currency }}</span>
+                @if ($purchase->edited_at)
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800" title="{{ $purchase->edited_at->format('d.m.Y H:i') }}">Düzenlendi</span>
+                @endif
                 @if ($purchase->isOverdue())
                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-800">Vadesi Geçti</span>
                 @endif
@@ -32,6 +35,7 @@
             <a href="{{ route('purchases.index') }}" class="text-sm text-gray-600 self-center hover:underline">← Alışlar</a>
             @role('Admin')
             @if (! $purchase->isCancelled())
+                <a href="{{ route('purchases.edit', $purchase) }}" class="text-sm text-indigo-600 border border-indigo-200 rounded-md px-3 py-1.5 hover:bg-indigo-50 self-center">Düzenle</a>
                 <form action="{{ route('purchases.cancel', $purchase) }}" method="POST" onsubmit="return confirm('Bu alış iptal edilsin mi? Stok, cari ve kasa hareketleri terslenecek.')">
                     @csrf
                     <button type="submit" class="text-sm text-red-600 border border-red-200 rounded-md px-3 py-1.5 hover:bg-red-50">Alışı İptal Et</button>

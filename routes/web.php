@@ -98,6 +98,8 @@ Route::middleware(['auth', 'license'])->group(function () {
         Route::post('/sales/{sale}/cancel', [SaleController::class, 'cancel'])->name('sales.cancel');
 
         Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
+        Route::get('/purchases/{purchase}/edit', [PurchaseController::class, 'edit'])->name('purchases.edit');
+        Route::put('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update');
         Route::post('/purchases/{purchase}/cancel', [PurchaseController::class, 'cancel'])->name('purchases.cancel');
 
         Route::get('/settings', [SettingController::class, 'edit'])->name('settings.edit');

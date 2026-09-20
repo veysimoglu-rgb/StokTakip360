@@ -22,7 +22,7 @@ class Purchase extends Model
         'number', 'account_id', 'payment_type', 'subtotal', 'discount_total',
         'total', 'paid_amount', 'currency', 'status', 'note', 'purchase_date', 'due_date', 'user_id',
         'debt_account_transaction_id', 'payment_account_transaction_id',
-        'cash_transaction_id', 'cancelled_at',
+        'cash_transaction_id', 'cancelled_at', 'edited_at',
     ];
 
     protected $casts = [
@@ -33,6 +33,7 @@ class Purchase extends Model
         'purchase_date' => 'datetime',
         'due_date' => 'date',
         'cancelled_at' => 'datetime',
+        'edited_at' => 'datetime',
     ];
 
     public function account()
@@ -83,6 +84,29 @@ class Purchase extends Model
     public function remaining(): float
     {
         return (float) $this->total - (float) $this->paid_amount;
+    }
+
+    /**
+     * Opaque fingerprint of everything an edit would overwrite. The edit form
+     * carries it; PurchaseService::update() refuses to save when it no longer
+     * matches (someone edited, paid or otherwise changed the purchase in the
+     * meantime). It combines updated_at with the ids of the current ledger
+     * legs, which are re-created by every edit, so two edits inside the same
+     * second still differ.
+     */
+    public function versionToken(): string
+    {
+        return sha1(implode('|', [
+            $this->id,
+            $this->updated_at?->format('Y-m-d H:i:s'),
+            $this->total,
+            $this->paid_amount,
+            $this->status,
+            $this->cancelled_at?->format('Y-m-d H:i:s'),
+            $this->debt_account_transaction_id,
+            $this->payment_account_transaction_id,
+            $this->cash_transaction_id,
+        ]));
     }
 
     /**

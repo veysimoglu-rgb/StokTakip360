@@ -32,6 +32,9 @@
                     <th class="hidden sm:table-cell px-4 py-3">Tedarikçi</th>
                     <th class="px-4 py-3 text-right">Tutar</th>
                     <th class="px-4 py-3">Durum</th>
+                    @role('Admin')
+                        <th class="px-4 py-3"></th>
+                    @endrole
                 </tr>
             </thead>
             <tbody class="divide-y">
@@ -56,9 +59,16 @@
                                 ])>{{ $purchase->statusLabel() }}</span>
                             @endif
                         </td>
+                        @role('Admin')
+                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                @if (! $purchase->isCancelled())
+                                    <a href="{{ route('purchases.edit', $purchase) }}" onclick="event.stopPropagation()" class="text-indigo-600 hover:underline text-xs">Düzenle</a>
+                                @endif
+                            </td>
+                        @endrole
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">Henüz alış yok.</td></tr>
+                    <tr><td colspan="6" class="px-4 py-6 text-center text-gray-500">Henüz alış yok.</td></tr>
                 @endforelse
             </tbody>
         </table>
