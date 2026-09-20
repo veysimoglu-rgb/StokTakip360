@@ -312,7 +312,6 @@
                 <span x-show="documentCurrency()" class="text-sm font-medium text-indigo-700 bg-indigo-50 rounded px-3 py-1">
                     Para Birimi: <span x-text="documentCurrency()"></span>
                 </span>
-                <button type="button" @click="addItem()" class="text-sm text-indigo-600 hover:underline">+ Satır Ekle</button>
             </div>
 
             {{-- Column titles: shown once, only in the compact desktop layout (>= 900px). --}}
@@ -392,6 +391,9 @@
                     </div>
                 </template>
             </div>
+
+            <x-add-row-button />
+
             <x-input-error :messages="$errors->get('items')" class="mt-2" />
             @foreach ($errors->get('items.*') as $messages)
                 <x-input-error :messages="$messages" class="mt-1" />
