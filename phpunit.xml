@@ -27,6 +27,19 @@
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
+        <!-- Tests must never reach the live MMC license service. Blank values make the license gate
+             "not configured" (fail-open), so ordinary feature tests are never blocked by it. The
+             license tests set their own config (https://mmc.test) and use Http::fake. force="true"
+             wins over a real .env; the matching <server> entries are needed too because Laravel reads
+             $_SERVER before $_ENV, so variables exported in the shell or CI would otherwise still win. -->
+        <env name="MMC_BASE_URL" value="" force="true"/>
+        <env name="MMC_SECRET" value="" force="true"/>
+        <env name="MMC_LICENSE_KEY" value="" force="true"/>
+        <env name="MMC_API_KEY" value="" force="true"/>
+        <server name="MMC_BASE_URL" value="" force="true"/>
+        <server name="MMC_SECRET" value="" force="true"/>
+        <server name="MMC_LICENSE_KEY" value="" force="true"/>
+        <server name="MMC_API_KEY" value="" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
