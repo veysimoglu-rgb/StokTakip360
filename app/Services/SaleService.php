@@ -78,6 +78,21 @@ class SaleService
 
             $sale->load('items');
 
+            // Money collected later through the cari screen (applied to this
+            // order) is not part of the order's own payment leg — it is kept.
+            // Those collections were booked on this order's cari and currency,
+            // so neither may change while they exist.
+            $laterCollections = (float) AccountTransaction::where('applies_to_type', Sale::class)
+                ->where('applies_to_id', $sale->id)
+                ->where('type', 'collection')
+                ->whereNull('cancelled_at')
+                ->whereNull('reversal_of_id')
+                ->sum('amount');
+
+            if ($laterCollections > 0 && (int) ($data['account_id'] ?? 0) !== (int) $sale->account_id) {
+                throw new RuntimeException('Bu siparişe sonradan yapılan tahsilatlar var; müşteri (cari) değiştirilemez. Önce ilgili tahsilatları iptal edin.');
+            }
+
             // Lock every product involved (old + new lines) in id order
             // before any stock is touched, so concurrent orders can't
             // deadlock or read stale stock.
@@ -103,18 +118,14 @@ class SaleService
             $products = $this->lockProducts($data['items']);
 
             $order = $this->prepareOrder($data, $products);
+
+            if ($laterCollections > 0 && $order['currency'] !== $sale->currency) {
+                throw new RuntimeException('Bu siparişe sonradan yapılan tahsilatlar var; para birimi değiştirilemez. Önce ilgili tahsilatları iptal edin.');
+            }
+
             $this->assertShortagesConfirmed($order['shortages'], $data);
 
             [$initialPayment] = $this->resolvePayment($data['payment_type'], $order['total'], $data['paid_amount'] ?? null);
-
-            // Money collected later through the cari screen (applied to this
-            // order) is not part of the order's own payment leg — keep it.
-            $laterCollections = (float) AccountTransaction::where('applies_to_type', Sale::class)
-                ->where('applies_to_id', $sale->id)
-                ->where('type', 'collection')
-                ->whereNull('cancelled_at')
-                ->whereNull('reversal_of_id')
-                ->sum('amount');
 
             $paidAmount = round($initialPayment + $laterCollections, 2);
 

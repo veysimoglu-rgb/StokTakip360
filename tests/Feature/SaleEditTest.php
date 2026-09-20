@@ -407,4 +407,155 @@ class SaleEditTest extends TestCase
         $this->actingAs($this->admin)->post("/sales/{$sale->id}/cancel");
         $this->actingAs($this->admin)->get("/sales/{$sale->id}")->assertOk()->assertDontSee(route('sales.edit', $sale), false);
     }
+
+    // ---------------------------------------------------------------- later collections: customer / currency guard
+
+    private function collect(Account $customer, Sale $sale, float $amount = 40): void
+    {
+        $this->actingAs($this->admin)->post("/accounts/{$customer->id}/collect", [
+            'amount' => $amount, 'currency' => 'TL', 'sale_id' => $sale->id,
+        ])->assertSessionHasNoErrors()->assertSessionMissing('error');
+    }
+
+    /** @return array<int, int> row counts of every ledger table, to prove a refused edit wrote nothing */
+    private function ledgerCounts(): array
+    {
+        return [StockMovement::count(), AccountTransaction::count(), CashTransaction::count()];
+    }
+
+    public function test_the_customer_cannot_change_once_a_later_collection_exists(): void
+    {
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $other = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product(100, 10);
+        $sale = $this->credit($customer, $product, 10, 10);
+        $this->collect($customer, $sale);
+        $before = $this->ledgerCounts();
+
+        $this->update($sale, $this->creditPayload($other, [['product_id' => $product->id, 'quantity' => 10, 'unit_price' => 10]]))
+            ->assertSessionHas('error');
+
+        $this->assertStringContainsString('müşteri (cari) değiştirilemez', session('error'));
+        $this->assertSame($before, $this->ledgerCounts());
+        $this->assertSame($customer->id, $sale->fresh()->account_id);
+        $this->assertNull($sale->fresh()->edited_at);
+        $this->assertSame(60.0, $customer->fresh()->balance());
+        $this->assertSame(0.0, $other->fresh()->balance());
+        $this->assertSame(90.0, (float) $product->fresh()->current_stock);
+    }
+
+    public function test_removing_the_customer_is_blocked_too_when_a_later_collection_exists(): void
+    {
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product(100, 10);
+        $sale = $this->credit($customer, $product, 10, 10);
+        $this->collect($customer, $sale);
+
+        $this->update($sale, ['payment_type' => 'pesin', 'items' => [['product_id' => $product->id, 'quantity' => 10, 'unit_price' => 10]]])
+            ->assertSessionHas('error');
+
+        $this->assertStringContainsString('müşteri (cari) değiştirilemez', session('error'));
+        $this->assertSame($customer->id, $sale->fresh()->account_id);
+        $this->assertSame(60.0, $customer->fresh()->balance());
+    }
+
+    public function test_the_currency_cannot_change_once_a_later_collection_exists(): void
+    {
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $tl = $this->product(100, 10);
+        $usd = Product::factory()->create(['current_stock' => 100, 'sale_price' => 10, 'currency' => 'USD']);
+        $sale = $this->credit($customer, $tl, 10, 10);
+        $this->collect($customer, $sale);
+        $before = $this->ledgerCounts();
+
+        $this->update($sale, $this->creditPayload($customer, [['product_id' => $usd->id, 'quantity' => 10, 'unit_price' => 10]]))
+            ->assertSessionHas('error');
+
+        $this->assertStringContainsString('para birimi değiştirilemez', session('error'));
+        $this->assertSame($before, $this->ledgerCounts());
+        $this->assertSame('TL', $sale->fresh()->currency);
+        $this->assertSame(90.0, (float) $tl->fresh()->current_stock);
+        $this->assertSame(100.0, (float) $usd->fresh()->current_stock);
+        $this->assertSame(60.0, $customer->fresh()->balance());
+        $this->assertSame(0.0, $customer->fresh()->balanceForCurrency('USD'));
+    }
+
+    public function test_the_guards_run_before_a_stock_shortage_warning(): void
+    {
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $other = Account::factory()->create(['type' => 'customer']);
+        $tl = $this->product(100, 10);
+        $usd = Product::factory()->create(['current_stock' => 5, 'sale_price' => 10, 'currency' => 'USD']);
+        $sale = $this->credit($customer, $tl, 10, 10);
+        $this->collect($customer, $sale);
+
+        // customer change + a quantity far beyond stock -> the customer message, not a stock warning
+        $this->update($sale, $this->creditPayload($other, [['product_id' => $tl->id, 'quantity' => 500, 'unit_price' => 10]]))
+            ->assertSessionHas('error')->assertSessionMissing('stock_warning');
+        $this->assertStringContainsString('müşteri (cari)', session('error'));
+
+        // currency change + shortage -> the currency message, not a stock warning
+        $this->update($sale, $this->creditPayload($customer, [['product_id' => $usd->id, 'quantity' => 50, 'unit_price' => 10]]))
+            ->assertSessionHas('error')->assertSessionMissing('stock_warning');
+        $this->assertStringContainsString('para birimi', session('error'));
+    }
+
+    public function test_customer_and_currency_can_still_change_when_there_is_no_later_collection(): void
+    {
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $other = Account::factory()->create(['type' => 'customer']);
+        $tl = $this->product(100, 10);
+        $usd = Product::factory()->create(['current_stock' => 100, 'sale_price' => 10, 'currency' => 'USD']);
+        $sale = $this->credit($customer, $tl, 10, 10);
+
+        $this->update($sale, $this->creditPayload($other, [['product_id' => $tl->id, 'quantity' => 10, 'unit_price' => 10]]))
+            ->assertSessionHasNoErrors()->assertSessionMissing('error');
+        $this->assertSame($other->id, $sale->fresh()->account_id);
+        $this->assertSame(0.0, $customer->fresh()->balance());
+        $this->assertSame(100.0, $other->fresh()->balance());
+
+        $this->update($sale, $this->creditPayload($other, [['product_id' => $usd->id, 'quantity' => 10, 'unit_price' => 10]]))
+            ->assertSessionHasNoErrors()->assertSessionMissing('error');
+        $this->assertSame('USD', $sale->fresh()->currency);
+        $this->assertSame(0.0, $other->fresh()->balanceForCurrency('TL'));
+        $this->assertSame(100.0, $other->fresh()->balanceForCurrency('USD'));
+        $this->assertSame(100.0, (float) $tl->fresh()->current_stock);
+        $this->assertSame(90.0, (float) $usd->fresh()->current_stock);
+    }
+
+    public function test_the_change_is_allowed_again_after_the_later_collection_is_cancelled(): void
+    {
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $other = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product(100, 10);
+        $sale = $this->credit($customer, $product, 10, 10);
+        $this->collect($customer, $sale);
+
+        $collection = CashTransaction::where('type', 'collection')->whereNull('reversal_of_id')->whereNull('cancelled_at')->first();
+        $this->actingAs($this->admin)->post("/cash-transactions/{$collection->id}/cancel")->assertRedirect();
+        $this->assertSame(0.0, (float) $sale->fresh()->paid_amount);
+
+        $this->update($sale, $this->creditPayload($other, [['product_id' => $product->id, 'quantity' => 10, 'unit_price' => 10]]))
+            ->assertSessionHasNoErrors()->assertSessionMissing('error');
+
+        $this->assertSame($other->id, $sale->fresh()->account_id);
+        $this->assertSame(0.0, $customer->fresh()->balance());
+        $this->assertSame(100.0, $other->fresh()->balance());
+    }
+
+    public function test_editing_within_the_same_customer_and_currency_still_preserves_the_later_collection(): void
+    {
+        $customer = Account::factory()->create(['type' => 'customer']);
+        $product = $this->product(100, 10);
+        $sale = $this->credit($customer, $product, 10, 10);
+        $this->collect($customer, $sale);
+
+        $this->update($sale, $this->creditPayload($customer, [['product_id' => $product->id, 'quantity' => 15, 'unit_price' => 10]]))
+            ->assertSessionHasNoErrors()->assertSessionMissing('error');
+
+        $sale->refresh();
+        $this->assertSame(150.0, (float) $sale->total);
+        $this->assertSame(40.0, (float) $sale->paid_amount);
+        $this->assertSame(110.0, $customer->fresh()->balance());
+    }
 }
