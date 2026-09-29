@@ -42,6 +42,7 @@ Route::middleware(['auth', 'license'])->group(function () {
 
     Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
     Route::get('/sales/create', [SaleController::class, 'create'])->middleware('role:Admin')->name('sales.create');
+    Route::get('/sales/last-prices', [SaleController::class, 'lastPrices'])->middleware('role:Admin')->name('sales.last-prices');
     Route::get('/sales/{sale}', [SaleController::class, 'show'])->name('sales.show');
     Route::get('/sales/{sale}/receipt', [SaleController::class, 'receipt'])->name('sales.receipt');
 

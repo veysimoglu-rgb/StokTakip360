@@ -1,6 +1,6 @@
 @php
     $isEdit = isset($sale) && $sale !== null;
-    $emptyRow = ['product_id' => '', 'quantity' => '', 'quantity_text' => '', 'quantity_error' => '', 'unit_price' => '', 'package_count' => '', 'package_text' => '', 'package_error' => ''];
+    $emptyRow = ['product_id' => '', 'quantity' => '', 'quantity_text' => '', 'quantity_error' => '', 'unit_price' => '', 'package_count' => '', 'package_text' => '', 'package_error' => '', 'price_touched' => false, 'last' => null];
 
     // Quantity fields are typed in Turkish format (0,345 / 20.000): the
     // visible *_text is that display form, the plain number is what the
@@ -18,6 +18,9 @@
             'package_count' => $num($i['package_qty_input'] ?? ''),
             'package_text' => $text($i['package_qty_input'] ?? ''),
             'package_error' => '',
+            // A price that came back from a failed submit is the user's own: never overwritten.
+            'price_touched' => ($i['unit_price'] ?? '') !== '',
+            'last' => null,
         ])->values()->all();
     } elseif ($isEdit) {
         $initialItems = $sale->items->map(function ($item) {
@@ -37,6 +40,9 @@
                 'package_count' => $count === null ? '' : (float) $count,
                 'package_text' => $count === null ? '' : \App\Support\Quantity::format($count),
                 'package_error' => '',
+                // Saved prices of an order being edited are never replaced by a last-sale lookup.
+                'price_touched' => true,
+                'last' => null,
             ];
         })->values()->all();
     } else {
@@ -106,7 +112,10 @@
         dueDate: '{{ $initialDueDate }}',
         submitting: false,
         confirmShortage: false,
-        addItem() { this.items.push({ product_id: '', quantity: '', quantity_text: '', quantity_error: '', unit_price: '', package_count: '', package_text: '', package_error: '' }) },
+        accountId: {{ Js::from((string) $initialAccount) }},
+        exceptSaleId: {{ $isEdit ? (int) $sale->id : 'null' }},
+        lastPricesUrl: '{{ route('sales.last-prices') }}',
+        addItem() { this.items.push({ product_id: '', quantity: '', quantity_text: '', quantity_error: '', unit_price: '', package_count: '', package_text: '', package_error: '', price_touched: false, last: null }) },
         removeItem(i) { if (this.items.length > 1) this.items.splice(i, 1) },
         productOf(item) { return this.products.find(p => p.id === Number(item.product_id)) },
         isPackaged(item) { const p = this.productOf(item); return !!(p && p.package_qty && p.subunit_to_base_qty) },
@@ -173,9 +182,42 @@
                 form.submit();
             });
         },
+        // Last price this customer paid for the product (order discount already
+        // applied). It only ever pre-fills a price the user has not typed
+        // themselves; when there is no earlier order the list price stays.
+        fetchLastPrices(rows) {
+            const accountId = this.accountId;
+            const asked = rows.filter(i => i.product_id).map(i => [i, i.product_id]);
+            if (!accountId || asked.length === 0) return;
+            const params = new URLSearchParams({ account_id: accountId });
+            [...new Set(asked.map(a => a[1]))].forEach(id => params.append('product_ids[]', id));
+            if (this.exceptSaleId) params.set('except_sale_id', this.exceptSaleId);
+            fetch(this.lastPricesUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (!data || accountId !== this.accountId) return;
+                    asked.forEach(([item, productId]) => {
+                        if (item.product_id !== productId) return;
+                        const hit = data.prices[productId] || null;
+                        item.last = hit;
+                        if (hit && !item.price_touched) item.unit_price = hit.unit_price;
+                    });
+                })
+                .catch(() => {});
+        },
+        onAccountChange() {
+            this.items.forEach(i => {
+                i.last = null;
+                if (!i.price_touched) { const p = this.productOf(i); i.unit_price = p ? p.price : ''; }
+            });
+            this.fetchLastPrices(this.items);
+        },
         onProductChange(item) {
             const p = this.productOf(item);
             item.unit_price = p ? p.price : '';
+            item.price_touched = false;
+            item.last = null;
+            this.fetchLastPrices([item]);
             item.package_count = '';
             item.package_text = '';
             item.package_error = '';
@@ -281,7 +323,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <x-input-label for="account_id" value="Müşteri (opsiyonel — peşinde boş bırakılabilir)" />
-                    <x-select-input id="account_id" name="account_id" class="w-full">
+                    <x-select-input id="account_id" name="account_id" class="w-full" x-model="accountId" @change="onAccountChange()">
                         <option value="">-</option>
                         @foreach ($accounts as $account)
                             <option value="{{ $account->id }}" @selected((string) $initialAccount === (string) $account->id)>{{ $account->name }}</option>
@@ -378,8 +420,14 @@
                         <div>
                             <label class="order-label block text-xs text-gray-500 mb-1" x-text="'Birim Fiyat' + (documentCurrency() ? ' (' + documentCurrency() + ')' : '')"></label>
                             <input type="number" min="0" step="0.01" inputmode="decimal" required
-                                   :name="'items['+index+'][unit_price]'" x-model.number="item.unit_price" :data-row="index" data-field="unit_price"
+                                   :name="'items['+index+'][unit_price]'" x-model.number="item.unit_price" @input="item.price_touched = true" :data-row="index" data-field="unit_price"
                                    class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm">
+                            {{-- Each part is unbreakable, so a narrow column wraps only between the parts. --}}
+                            <p x-show="item.last" x-cloak class="text-xs text-gray-500 mt-1" data-last-sale>
+                                Son satış: <span class="whitespace-nowrap" x-text="item.last ? item.last.unit_price_text : ''"></span> ·
+                                <span class="whitespace-nowrap" x-text="item.last ? item.last.number : ''"></span> ·
+                                <span class="whitespace-nowrap" x-text="item.last ? item.last.date : ''"></span>
+                            </p>
                         </div>
                         <div class="order-total text-sm text-gray-600">
                             <span class="order-label block text-xs text-gray-500 mb-1">Satır Toplamı</span>

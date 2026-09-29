@@ -6,7 +6,10 @@ use App\Exceptions\InsufficientStockException;
 use App\Models\Account;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Models\Setting;
+use App\Services\LastSalePriceFinder;
 use App\Services\SaleService;
+use App\Support\Currency;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use RuntimeException;
@@ -33,6 +36,30 @@ class SaleController extends Controller
         $accounts = Account::where('active', true)->whereIn('type', ['customer', 'other'])->orderBy('name')->get();
 
         return view('sales.create', compact('products', 'accounts'));
+    }
+
+    /**
+     * Last price a customer paid per product (discount applied), used by the
+     * order form to pre-fill the unit price. Read-only JSON.
+     */
+    public function lastPrices(Request $request, LastSalePriceFinder $finder)
+    {
+        $data = $request->validate([
+            'account_id' => ['required', 'integer', 'exists:accounts,id'],
+            'product_ids' => ['required', 'array', 'max:100'],
+            'product_ids.*' => ['integer', 'exists:products,id'],
+            'except_sale_id' => ['nullable', 'integer'],
+        ]);
+
+        $prices = [];
+
+        foreach (Product::whereIn('id', array_unique($data['product_ids']))->get() as $product) {
+            if ($found = $finder->find((int) $data['account_id'], $product, isset($data['except_sale_id']) ? (int) $data['except_sale_id'] : null)) {
+                $prices[$product->id] = $found + ['unit_price_text' => Currency::format($found['unit_price'], $found['currency'])];
+            }
+        }
+
+        return response()->json(['prices' => (object) $prices]);
     }
 
     public function store(Request $request)
@@ -105,7 +132,11 @@ class SaleController extends Controller
     {
         $sale->load(['account', 'items.product']);
 
-        return view('sales.receipt-print', compact('sale'));
+        // The heading is the company using the program (Ayarlar > Firma Adı),
+        // never the customer; the app name stands in until one is entered.
+        $companyName = trim((string) Setting::get('company_name')) ?: config('app.name');
+
+        return view('sales.receipt-print', compact('sale', 'companyName'));
     }
 
     public function cancel(Request $request, Sale $sale)

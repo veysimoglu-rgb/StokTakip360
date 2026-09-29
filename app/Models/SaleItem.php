@@ -38,6 +38,24 @@ class SaleItem extends Model
     }
 
     /**
+     * Paket (subunit) count inside one balya as it was when the order was
+     * placed, for the receipt's "6 × 15 · 66 kg" helper line. Display only:
+     * derived from the frozen multiplier so a later change of the product's
+     * packaging does not rewrite old receipts; null when it cannot be told.
+     */
+    public function packagesPerBale(): ?int
+    {
+        $perPackage = (int) $this->product?->subunit_to_base_qty;
+        $multiplier = (float) $this->unit_multiplier_snapshot;
+
+        if ($perPackage > 0 && $multiplier > 0 && fmod($multiplier, $perPackage) === 0.0) {
+            return (int) ($multiplier / $perPackage);
+        }
+
+        return $this->product?->package_qty > 0 ? (int) $this->product->package_qty : null;
+    }
+
+    /**
      * (unit_price - cost_price) * quantity, in this line's own currency —
      * or null when no cost snapshot exists (legacy pre-WP-9a rows), never 0.
      * Callers must render that as "Maliyet bilgisi yok", not as zero profit.

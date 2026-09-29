@@ -18,10 +18,12 @@
             <x-text-input type="date" name="date_to" value="{{ request('date_to') }}" />
             <x-secondary-button type="submit">Filtrele</x-secondary-button>
         </form>
-        <div class="flex gap-2">
-            <a href="{{ route('stock-movements.in') }}"><x-primary-button>+ Stok Girişi</x-primary-button></a>
-            <a href="{{ route('stock-movements.out') }}"><x-primary-button>+ Stok Çıkışı</x-primary-button></a>
-        </div>
+        @role('Admin')
+            <div class="flex gap-2">
+                <a href="{{ route('stock-movements.in') }}"><x-primary-button>+ Stok Girişi</x-primary-button></a>
+                <a href="{{ route('stock-movements.out') }}"><x-primary-button>+ Stok Çıkışı</x-primary-button></a>
+            </div>
+        @endrole
     </div>
 
     <div class="bg-white rounded-lg shadow overflow-x-auto">

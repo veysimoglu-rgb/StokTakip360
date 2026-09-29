@@ -51,12 +51,8 @@
                 <div>
                     <p class="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">Stok İşlemleri</p>
                     <div class="space-y-1">
-                        <x-sidebar-link :href="route('stock-movements.in')" :active="request()->routeIs('stock-movements.in')">
-                            Stok Girişi
-                        </x-sidebar-link>
-                        <x-sidebar-link :href="route('stock-movements.out')" :active="request()->routeIs('stock-movements.out')">
-                            Stok Çıkışı
-                        </x-sidebar-link>
+                        {{-- Stok Girişi / Çıkışı are not menu items: purchases create stock-in and orders create
+                             stock-out. The manual screens (Admin only) stay reachable from Stok Hareketleri. --}}
                         <x-sidebar-link :href="route('stock-movements.index')" :active="request()->routeIs('stock-movements.index')">
                             Stok Hareketleri
                         </x-sidebar-link>
