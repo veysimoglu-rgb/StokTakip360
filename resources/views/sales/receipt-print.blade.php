@@ -16,13 +16,18 @@
         .meta { display: flex; justify-content: space-between; margin-bottom: 10px; }
         .meta div { line-height: 1.5; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-        th, td { padding: 4px 6px; font-size: 11px; text-align: left; vertical-align: top; }
+        th, td { padding: 4px 4px; font-size: 11px; text-align: left; vertical-align: top; }
+        th:first-child, td:first-child { padding-left: 0; }
+        th:last-child, td:last-child { padding-right: 0; }
+        /* Six columns on A5: only the product name may wrap; codes, quantities and money never split. */
+        .nowrap { white-space: nowrap; }
+        .name { overflow-wrap: anywhere; }
         thead th { border-bottom: 1px solid #111; }
         tbody tr { border-bottom: 1px dashed #ccc; }
         .text-right { text-align: right; }
         .code { width: 1%; white-space: nowrap; font-size: 10px; }
-        .sub { display: block; font-size: 9px; color: #666; }
-        .sub-warn { display: block; font-size: 9px; color: #b91c1c; }
+        .sub { display: block; font-size: 9px; color: #666; white-space: nowrap; }
+        .sub-warn { display: block; font-size: 9px; color: #b91c1c; white-space: normal; }
         .summary { width: 65%; margin-left: auto; }
         .summary div { display: flex; justify-content: space-between; padding: 2px 0; }
         .summary .total { font-weight: bold; font-size: 13px; border-top: 1px solid #111; margin-top: 4px; padding-top: 4px; }
@@ -47,7 +52,7 @@
     </div>
 
     <div class="header">
-        <h1>{{ $sale->account?->name ?? 'Genel Müşteri' }}</h1>
+        <h1>{{ $companyName }}</h1>
         <h2>Sipariş Fişi</h2>
         <p class="disclaimer">Bu belge resmi fatura veya irsaliye yerine geçmez.</p>
     </div>
@@ -70,20 +75,29 @@
             <tr>
                 <th class="code">Ürün Kodu</th>
                 <th>Ürün</th>
-                <th class="text-right">Miktar</th>
-                <th class="text-right">Birim Fiyat</th>
-                <th class="text-right">Tutar</th>
+                <th class="text-right nowrap">Miktar</th>
+                <th class="text-right nowrap">Adet</th>
+                <th class="text-right nowrap">Birim Fiyat</th>
+                <th class="text-right nowrap">Tutar</th>
             </tr>
         </thead>
         <tbody>
             @foreach ($sale->items as $item)
                 <tr>
                     <td class="code">{{ $item->product->code }}</td>
-                    <td>{{ $item->product->name }}</td>
-                    <td class="text-right">
+                    <td class="name">{{ $item->product->name }}</td>
+                    <td class="text-right nowrap">
                         @if ($item->package_qty_input !== null)
+                            @php
+                                // "6 × 15 · 66 kg": balya × paket, then weight — no unit words.
+                                $perBale = $item->packagesPerBale();
+                                $helper = trim(
+                                    \App\Support\Quantity::format($item->package_qty_input).($perBale !== null ? ' × '.$perBale : '')
+                                    .($item->line_weight_kg !== null ? ' · '.\App\Support\Quantity::format($item->line_weight_kg).' kg' : '')
+                                );
+                            @endphp
                             {{ \App\Support\Quantity::format($item->package_qty_input) }} {{ $item->product->package_label ?: 'Paket' }}
-                            <span class="sub">{{ \App\Support\Quantity::format($item->quantity) }} {{ $item->product->unit }}{{ $item->line_weight_kg !== null ? ' · '.\App\Support\Quantity::format($item->line_weight_kg).' kg' : '' }}</span>
+                            <span class="sub">{{ $helper }}</span>
                         @else
                             {{ \App\Support\Quantity::format($item->quantity) }} {{ $item->product->unit }}
                         @endif
@@ -91,8 +105,9 @@
                             <span class="sub-warn">{{ \App\Support\Quantity::format($item->stock_shortfall_quantity) }} stokta karşılanamadı</span>
                         @endif
                     </td>
-                    <td class="text-right">{{ \App\Support\Currency::format($item->unit_price, $sale->currency) }}</td>
-                    <td class="text-right">{{ \App\Support\Currency::format($item->line_total, $sale->currency) }}</td>
+                    <td class="text-right nowrap">{{ \App\Support\Quantity::format($item->quantity) }}</td>
+                    <td class="text-right nowrap">{{ \App\Support\Currency::format($item->unit_price, $sale->currency) }}</td>
+                    <td class="text-right nowrap">{{ \App\Support\Currency::format($item->line_total, $sale->currency) }}</td>
                 </tr>
             @endforeach
         </tbody>

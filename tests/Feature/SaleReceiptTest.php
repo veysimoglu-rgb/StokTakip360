@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
@@ -138,16 +139,86 @@ class SaleReceiptTest extends TestCase
         $response = $this->actingAs($this->admin())->get(route('sales.receipt', Sale::first()));
 
         $response->assertOk();
-        // Ağırlık kolonu yok; miktar hücresi iki satır: ana metin paket, gri yardımcı satır adet · ağırlık
-        $response->assertDontSee('<th class="text-right">Ağırlık</th>', false);
-        $response->assertSeeInOrder(['10 Balya', '<span class="sub">15.000 Adet · 85 kg</span>'], false);
+        // Ağırlık kolonu yok; miktar hücresi iki satır: ana metin balya, gri yardımcı satır balya × paket · ağırlık
+        $response->assertDontSee('Ağırlık</th>', false);
+        $response->assertSeeInOrder(['10 Balya', '<span class="sub">10 × 15 · 85 kg</span>', '<td class="text-right nowrap">15.000</td>'], false);
         $response->assertSeeInOrder(['Toplam Ağırlık', '85 kg']);
         $response->assertSee('30.000,00 TL');
     }
 
-    // Fiş başlığı seçilen müşteriye göre dinamik: uygulama adı değil müşteri adı
-    public function test_receipt_header_shows_the_selected_customers_name_not_the_app_name(): void
+    // Spesifikasyon örneği: 7 Balya / 7 × 15 · 56 kg / Adet 10.500 — birim kelimeleri yardımcı satırda tekrarlanmaz
+    public function test_receipt_shows_bale_helper_line_and_a_separate_adet_column(): void
     {
+        $product = Product::factory()->create([
+            'code' => 'STR-01', 'name' => 'Streç Film', 'current_stock' => 100000, 'sale_price' => 2, 'currency' => 'TL', 'unit' => 'Adet',
+            'package_label' => 'Balya', 'package_qty' => 15, 'subunit_label' => 'Paket',
+            'subunit_to_base_qty' => 100, 'package_weight_kg' => 8,
+        ]);
+
+        $this->actingAs($this->admin())->post('/sales', [
+            'payment_type' => 'pesin',
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'package_qty_input' => 7, 'unit_price' => 2]],
+        ])->assertSessionHasNoErrors();
+
+        $response = $this->actingAs($this->admin())->get(route('sales.receipt', Sale::first()));
+
+        $response->assertSeeInOrder([
+            '<th class="code">Ürün Kodu</th>', '<th>Ürün</th>', '<th class="text-right nowrap">Miktar</th>',
+            '<th class="text-right nowrap">Adet</th>', '<th class="text-right nowrap">Birim Fiyat</th>', '<th class="text-right nowrap">Tutar</th>',
+        ], false);
+        $response->assertDontSee('Ağırlık</th>', false);
+        $response->assertSeeInOrder(['7 Balya', '<span class="sub">7 × 15 · 56 kg</span>'], false);
+        $response->assertSeeInOrder(['<span class="sub">7 × 15 · 56 kg</span>', '<td class="text-right nowrap">10.500</td>', '2,00 TL', '21.000,00 TL'], false);
+        // Yardımcı satırda birim kelimesi yok; eski "10.500 Adet · 56 kg" biçimi de yok
+        $response->assertDontSee('10.500 Adet', false);
+        $response->assertDontSee('7 × 15 Paket', false);
+        $response->assertSeeInOrder(['Toplam Ağırlık', '56 kg']);
+    }
+
+    // Yardımcı satırdaki paket sayısı sipariş anındaki çarpandan gelir: ürünün paketleme ayarı sonra değişse de eski fiş bozulmaz
+    public function test_bale_helper_line_uses_the_frozen_multiplier_not_the_products_current_packaging(): void
+    {
+        $product = Product::factory()->create([
+            'current_stock' => 100000, 'sale_price' => 2, 'currency' => 'TL', 'unit' => 'Adet',
+            'package_label' => 'Balya', 'package_qty' => 15, 'subunit_label' => 'Paket',
+            'subunit_to_base_qty' => 100, 'package_weight_kg' => 8,
+        ]);
+
+        $this->actingAs($this->admin())->post('/sales', [
+            'payment_type' => 'pesin',
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'package_qty_input' => 6, 'unit_price' => 2]],
+        ])->assertSessionHasNoErrors();
+
+        $product->update(['package_qty' => 20]);
+
+        $this->actingAs($this->admin())->get(route('sales.receipt', Sale::first()))
+            ->assertSee('<span class="sub">6 × 15 · 48 kg</span>', false)
+            ->assertDontSee('6 × 20', false);
+    }
+
+    // Paketsiz ürün: Miktar hücresi eskisi gibi "2 Adet", gri yardımcı satır yok, Adet sütununda gerçek adet (2) — "–" değil
+    public function test_unpackaged_line_keeps_its_plain_quantity_and_has_no_helper_line(): void
+    {
+        $product = $this->product();
+
+        $this->actingAs($this->admin())->post('/sales', [
+            'payment_type' => 'pesin',
+            'items' => [['product_id' => $product->id, 'quantity' => 2, 'unit_price' => 50]],
+        ]);
+
+        $response = $this->actingAs($this->admin())->get(route('sales.receipt', Sale::first()));
+
+        $response->assertSee('2 Adet');
+        $response->assertSee('<td class="text-right nowrap">2</td>', false);
+        $response->assertDontSee('<span class="sub">', false);
+        $response->assertDontSee('Ağırlık', false);
+        $response->assertDontSee('–', false);
+    }
+
+    // Fiş başlığı programı kullanan firma (Ayarlar > Firma Adı); müşteri adı yalnızca Müşteri alanında
+    public function test_receipt_header_shows_the_company_name_and_the_customer_only_in_the_customer_field(): void
+    {
+        Setting::set('company_name', 'TEK-IN PACK AMBALAJ SAN. VE TİC. LTD. ŞTİ.');
         $product = $this->product();
 
         foreach (['Fera Plastik', 'Yılmaz Ambalaj Ltd. Şti.'] as $name) {
@@ -161,23 +232,49 @@ class SaleReceiptTest extends TestCase
 
             $response = $this->actingAs($this->admin())->get(route('sales.receipt', Sale::latest('id')->first()));
 
-            $response->assertSee('<h1>'.e($name).'</h1>', false);
+            $response->assertSee('<h1>'.e('TEK-IN PACK AMBALAJ SAN. VE TİC. LTD. ŞTİ.').'</h1>', false);
             $response->assertSee('<h2>Sipariş Fişi</h2>', false);
+            $response->assertDontSee('<h1>'.e($name).'</h1>', false);
+            $response->assertSee('<strong>Müşteri:</strong> '.e($name), false);
             $response->assertSee('Bu belge resmi fatura veya irsaliye yerine geçmez.');
-            $response->assertDontSee('<h1>'.e(config('app.name')).'</h1>', false);
         }
     }
 
-    public function test_receipt_header_falls_back_for_an_order_without_a_cari(): void
+    // Firma adı yoksa başlık boş kalmaz: uygulama adı; müşteri adı başlığa sızmaz
+    public function test_receipt_header_falls_back_to_the_app_name_without_a_company_name(): void
     {
+        $customer = Account::factory()->create(['type' => 'customer', 'name' => 'Fera Plastik']);
+        $this->actingAs($this->admin())->post('/sales', [
+            'account_id' => $customer->id,
+            'payment_type' => 'vadeli',
+            'due_date' => now()->addDays(30)->toDateString(),
+            'items' => [['product_id' => $this->product()->id, 'quantity' => 1, 'unit_price' => 50]],
+        ]);
+
+        foreach ([null, '   '] as $blank) {
+            Setting::set('company_name', $blank);
+
+            $this->actingAs($this->admin())->get(route('sales.receipt', Sale::first()))
+                ->assertSee('<h1>'.e(config('app.name')).'</h1>', false)
+                ->assertDontSee('<h1>Fera Plastik</h1>', false)
+                ->assertSee('<strong>Müşteri:</strong> Fera Plastik', false);
+        }
+    }
+
+    // Cari yok: başlıkta firma, Müşteri alanında "Genel Müşteri"
+    public function test_receipt_header_for_an_order_without_a_cari(): void
+    {
+        Setting::set('company_name', 'Fera Plastik Sanayi Ltd. Şti.');
+
         $this->actingAs($this->admin())->post('/sales', [
             'payment_type' => 'pesin',
             'items' => [['product_id' => $this->product()->id, 'quantity' => 1, 'unit_price' => 50]],
         ]);
 
         $this->actingAs($this->admin())->get(route('sales.receipt', Sale::first()))
-            ->assertSee('<h1>Genel Müşteri</h1>', false)
-            ->assertDontSee('<h1>'.e(config('app.name')).'</h1>', false);
+            ->assertSee('<h1>Fera Plastik Sanayi Ltd. Şti.</h1>', false)
+            ->assertDontSee('<h1>Genel Müşteri</h1>', false)
+            ->assertSee('<strong>Müşteri:</strong> Genel Müşteri', false);
     }
 
     // Fişin en altındaki "… tarafından oluşturulmuştur." satırı kaldırıldı; geri kalan içerik duruyor
@@ -196,7 +293,7 @@ class SaleReceiptTest extends TestCase
             ->assertSee('Sipariş Toplamı');
     }
 
-    // Fişte ürün kodu kolonu: Ürün Kodu | Ürün | Miktar | Birim Fiyat | Tutar
+    // Fişte ürün kodu kolonu: Ürün Kodu | Ürün | Miktar | Adet | Birim Fiyat | Tutar
     public function test_receipt_lists_the_product_code_before_the_product_name(): void
     {
         $product = Product::factory()->create(['code' => 'NYL-3040', 'name' => 'Naylon Poşet', 'current_stock' => 100, 'sale_price' => 10, 'currency' => 'TL']);
@@ -209,11 +306,11 @@ class SaleReceiptTest extends TestCase
         $response = $this->actingAs($this->admin())->get(route('sales.receipt', Sale::first()));
 
         $response->assertSeeInOrder([
-            '<th class="code">Ürün Kodu</th>', '<th>Ürün</th>', '<th class="text-right">Miktar</th>',
-            '<th class="text-right">Birim Fiyat</th>', '<th class="text-right">Tutar</th>',
+            '<th class="code">Ürün Kodu</th>', '<th>Ürün</th>', '<th class="text-right nowrap">Miktar</th>', '<th class="text-right nowrap">Adet</th>',
+            '<th class="text-right nowrap">Birim Fiyat</th>', '<th class="text-right nowrap">Tutar</th>',
         ], false);
-        $response->assertSeeInOrder(['<td class="code">NYL-3040</td>', '<td>Naylon Poşet</td>'], false);
-        $response->assertDontSee('<th class="text-right">Ağırlık</th>', false);
+        $response->assertSeeInOrder(['<td class="code">NYL-3040</td>', '<td class="name">Naylon Poşet</td>'], false);
+        $response->assertDontSee('Ağırlık</th>', false);
     }
 
     // Tarayıcının yazdırma başlığı (tarih/saat + sayfa başlığı) basılmasın: sayfa boşluğu 0, 10 mm gövde boşluğu olarak korunur
